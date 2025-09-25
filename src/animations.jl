@@ -1,4 +1,6 @@
-function animate(prob::SwimmingTrajectoryProblem;
+function animate(
+    traj::Trajectory,
+    swimmer::Swimmer;
     wall=false, 
     limits=nothing, 
     step=5,
@@ -7,10 +9,7 @@ function animate(prob::SwimmingTrajectoryProblem;
     elevation=π/36, 
     azimuth=π/4
 )
-    traj = prob.traj
-    ts = prob.traj.t
-    swimmer = prob.swimming_problem.swimmer
-    # b3 = reduce(hcat, cross.(traj.b1, traj.b2))
+    ts = traj.t
     
     t = Observable(1)
     T = @lift(traj.x[1:$t])
@@ -69,6 +68,12 @@ function animate(prob::SwimmingTrajectoryProblem;
     end
     # fig
 end
+
+animate(prob::SwimmingTrajectoryProblem; kwargs...) = animate(
+        prob.traj, prob.swimming_problem.swimmer; 
+        kwargs...   
+)
+
 
 """Animate particle trajectories in a flow, NEEDS UPDATING"""
 function animate(prob::ParticleTrajectoryProblem;
