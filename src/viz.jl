@@ -52,12 +52,6 @@ function viz!(ax, body::CellBody)
     viz!(ax, buf)
 end
 
-# function plot(body::CellBody)
-#     fig = Figure()
-#     ax = Axis3(fig[1,1], aspect=:data)
-#     plot!(ax, body)
-#     fig
-# end
 
 # Flagellum 
 

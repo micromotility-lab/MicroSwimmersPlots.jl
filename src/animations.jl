@@ -1,6 +1,6 @@
 function animate(
     traj::Trajectory,
-    swimmer::Swimmer;
+    microswimmer::MicroSwimmer;
     wall=false, 
     limits=nothing, 
     step=5,
@@ -15,7 +15,7 @@ function animate(
     T = @lift(traj.x[1:$t])
 
     if isnothing(limits)
-        r_max = maximum(norm, swimmer.points.force_pts)
+        r_max = maximum(norm, microswimmer.points.force_pts)
         xs = getindex.(traj.x, 1)
         ys = getindex.(traj.x, 2)
         zs = getindex.(traj.x, 3)
@@ -29,14 +29,14 @@ function animate(
     fig = Figure()
     ax = Axis3(fig[1, 1], aspect=:data, limits=limits, elevation=elevation, azimuth=azimuth)
     # ax = LScene(fig[1, 1])
-    obs = viz!(ax, swimmer)
+    obs = viz!(ax, microswimmer)
     lines!(ax, T, color=:red, linewidth=0.5)
     yield()
     display(fig)
     
     on(t) do i
-        move_boundary!(swimmer, traj.x[i], traj.b1[i], traj.b2[i], ts[i])
-        update_buffer!(obs[], swimmer)
+        move_boundary!(microswimmer, traj.x[i], traj.b1[i], traj.b2[i], ts[i])
+        update_buffer!(obs[], microswimmer)
         notify(obs)
     end
 
@@ -70,13 +70,16 @@ function animate(
 end
 
 animate(prob::SwimmingTrajectoryProblem; kwargs...) = animate(
-        prob.traj, prob.swimming_problem.swimmer; 
+        prob.traj, prob.swimming_problem.microswimmer; 
         kwargs...   
 )
 
 
 """Animate particle trajectories in a flow, NEEDS UPDATING"""
-function animate(prob::ParticleTrajectoryProblem;
+function animate(
+    ts::Vector,
+    traj::Matrix,
+    microswimmer::MicroSwimmer;
     wall=false, 
     limits=(-5., 5., -5., 5., -5., 5.), 
     step=5,
@@ -87,10 +90,6 @@ function animate(prob::ParticleTrajectoryProblem;
     azimuth=π/4,
     num_particles=nothing
 )
-    traj = prob.trajectories
-    ts = prob.t
-    swimmer = prob.resistance_problem.swimmer
-
     t = Observable(1)
     num_particles = isnothing(num_particles) ? size(traj,1) ÷ 3 : num_particles
 
@@ -103,7 +102,7 @@ function animate(prob::ParticleTrajectoryProblem;
     fig = Figure()
     ax = Axis3(fig[1, 1], aspect=:data, limits=limits, elevation=elevation, azimuth=azimuth)
     # ax = LScene(fig[1, 1])
-    obs = viz!(ax, swimmer)
+    obs = viz!(ax, microswimmer)
 
 
     for i in 1:num_particles
@@ -125,8 +124,8 @@ function animate(prob::ParticleTrajectoryProblem;
 
     
     on(t) do i
-        update_boundary!(swimmer, ts[i])
-        update_buffer!(obs[], swimmer)
+        update_boundary!(microswimmer, ts[i])
+        update_buffer!(obs[], microswimmer)
         notify(obs)
     end
 
@@ -141,3 +140,8 @@ function animate(prob::ParticleTrajectoryProblem;
         end 
     end
 end
+
+animate(prob::ParticleTrajectoryProblem; kwargs...) = animate(
+        prob.t, prob.trajectories, prob.resistance_problem.microswimmer; 
+        kwargs...   
+)
