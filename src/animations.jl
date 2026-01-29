@@ -1,3 +1,15 @@
+function animate(microswimmer::MicroSwimmer, T=5.0, num_t=20*5+1)
+    fig = Figure()
+    ax = Axis3(fig[1,1], aspect=:data)
+    B = viz!(ax, microswimmer)
+    display(fig)
+    for t in range(0, T, num_t)
+        update_boundary!(microswimmer, t)
+        update_buffer_observable!(B, microswimmer)
+        sleep(0.01)
+    end
+end
+
 function animate(
     traj::Trajectory,
     microswimmer::MicroSwimmer;
@@ -6,6 +18,7 @@ function animate(
     step=5,
     filename=nothing,
     framerate=20,
+    compression=20,
     elevation=π/36, 
     azimuth=π/4
 )
@@ -27,8 +40,8 @@ function animate(
     end
 
     fig = Figure()
-    ax = Axis3(fig[1, 1], aspect=:data, limits=limits, elevation=elevation, azimuth=azimuth)
     # ax = LScene(fig[1, 1])
+    ax = Axis3(fig[1, 1], aspect=:data, limits=limits, elevation=elevation, azimuth=azimuth)
     obs = viz!(ax, microswimmer)
     lines!(ax, T, color=:red, linewidth=0.5)
     yield()
@@ -36,8 +49,7 @@ function animate(
     
     on(t) do i
         move_boundary!(microswimmer, traj.x[i], traj.b1[i], traj.b2[i], ts[i])
-        update_buffer!(obs[], microswimmer)
-        notify(obs)
+        update_buffer_observable!(obs, microswimmer)
     end
 
     # pts = @lift(get_points($s))
@@ -62,7 +74,7 @@ function animate(
             sleep(1 // framerate)
         end
     else
-        record(fig, filename, 1:length(ts); framerate=framerate) do i 
+        record(fig, filename, 1:length(ts); framerate=framerate, compression=compression) do i 
             t[] = i
         end 
     end

@@ -7,6 +7,7 @@ using GeometryBasics
 using Parameters
 using Meshing
 using StaticArrays
+using Interpolations
 
 include("mesh_gen.jl")
 include("viz.jl")

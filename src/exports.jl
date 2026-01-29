@@ -1,3 +1,4 @@
-export viz, viz!, viz_xy, viz_xz, viz_yz
-export update_buffer_observable!, update_buffer!
+export viz, viz!, stream
+export get_buffer, update_buffer_observable!, update_buffer!
+export ellipsoidal_grooved_ellipsoid
 export animate
