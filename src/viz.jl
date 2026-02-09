@@ -193,24 +193,10 @@ end
     throw(ArgumentError("plane must be :xy, :xz, or :yz"))
 end
 
-
-# function components_on_plane(vf::PlanarVelocityField)
-#     @unpack n1, n2, velocities, plane = vf
-#     i, j = plane === :xy ? (1, 2) :
-#            plane === :xz ? (1, 3) :
-#            plane === :yz ? (2, 3) :
-#            throw(ArgumentError("plane must be :xy, :xz, or :yz"))
-
-#     U = reshape(getindex.(vs, i), n1, n2)
-#     V = reshape(getindex.(vs, j), n1, n2)
-#     U, V
-# end
-
-function viz(vf::PlanarVelocityField)
+function viz(vf::PlanarVelocityField; fig = Figure())
     points2 = [_proj2(vf.plane, x) for x in vf.points]
     vels2   = [_proj2(vf.plane, v) for v in vf.velocities]
 
-    fig = Figure()
     (xl, yl) = _labels(vf.plane)
     ax = Axis(fig[1,1], aspect=DataAspect(), xlabel=xl, ylabel=yl)
 
@@ -225,7 +211,7 @@ function viz(vf::PlanarVelocityField)
     fig
 end
 
-function stream(vf::PlanarVelocityField; colorscale=identity)
+function stream(vf::PlanarVelocityField; fig = Figure(), colorscale=identity)
     @unpack plane, a_range, b_range, c, velocities = vf
     ind = plane === :xy ? (1,2) : (plane === :xz ? (1,3) : (2,3))
     n1, n2 = length(a_range), length(b_range)
@@ -239,7 +225,6 @@ function stream(vf::PlanarVelocityField; colorscale=identity)
     u_func(x, y) = Point2(itp_u(x, y), itp_v(x, y))
 
     vel_mag = sqrt.(U.^2 .+ V.^2)
-    fig = Figure()
     (xl, yl) = _labels(plane)
     ax = Axis(fig[1,1], xlabel=xl, ylabel=yl, aspect=DataAspect())
     hm = heatmap!(ax, a_range, b_range, vel_mag, colorscale=colorscale)  # colorrange=(vmin, vmax))
@@ -252,6 +237,8 @@ function stream(vf::PlanarVelocityField; colorscale=identity)
         maxsteps=20000
     )
     Colorbar(fig[1, 2], hm, label="v")
+    # colsize!(fig.layout, 1, Aspect(1, 1.0))
+    # rowsize!(fig.layout, 1, Aspect(1, 1.0))
     fig
 end
 
