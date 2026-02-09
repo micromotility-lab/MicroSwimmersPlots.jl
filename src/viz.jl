@@ -193,19 +193,6 @@ end
     throw(ArgumentError("plane must be :xy, :xz, or :yz"))
 end
 
-
-# function components_on_plane(vf::PlanarVelocityField)
-#     @unpack n1, n2, velocities, plane = vf
-#     i, j = plane === :xy ? (1, 2) :
-#            plane === :xz ? (1, 3) :
-#            plane === :yz ? (2, 3) :
-#            throw(ArgumentError("plane must be :xy, :xz, or :yz"))
-
-#     U = reshape(getindex.(vs, i), n1, n2)
-#     V = reshape(getindex.(vs, j), n1, n2)
-#     U, V
-# end
-
 function viz(vf::PlanarVelocityField; fig = Figure())
     points2 = [_proj2(vf.plane, x) for x in vf.points]
     vels2   = [_proj2(vf.plane, v) for v in vf.velocities]
@@ -250,7 +237,8 @@ function stream(vf::PlanarVelocityField; fig = Figure(), colorscale=identity)
         maxsteps=20000
     )
     Colorbar(fig[1, 2], hm, label="v")
-    colsize!(fig.layout, 1, Aspect(1, 1.0))
+    # colsize!(fig.layout, 1, Aspect(1, 1.0))
+    # rowsize!(fig.layout, 1, Aspect(1, 1.0))
     fig
 end
 
