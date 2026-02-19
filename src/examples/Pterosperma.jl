@@ -23,6 +23,7 @@ body = SphericalBody(a=4.5, N=N_body, Q=Q_body)
 
 f_model = StandingWaveFlagellum(
     70.,    # L
+    0.0,    # C
     0.18,   # A01
     0.26,   # ϕ01
     0.13,   # A11

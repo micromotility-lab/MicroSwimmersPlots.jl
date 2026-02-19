@@ -37,14 +37,14 @@ f = Flagellum(
 # Some alternative flagella beating envelopes changing R₀, R₁ and k
 
 f = Flagellum(PlanarFlagellum(1., 0., 0.6, 0., 2π, 2π, 2π, 0.0), N, Q) 
-f3 = Flagellum(PlanarFlagellum(1., 0., 1.3, 0., 2π, 2π, 2π, 0.0), N, Q)
-f4 = Flagellum(PlanarFlagellum(1., 0., 0., 0.5, π/2, 2π, 2π, 0.0), N, Q)
-f5 = Flagellum(PlanarFlagellum(1., 0., 0.6, 0.5, π/2, -2π, 2π, 0.0), N, Q)
+f = Flagellum(PlanarFlagellum(1., 0., 1.3, 0., 2π, 2π, 2π, 0.0), N, Q)
+f = Flagellum(PlanarFlagellum(1., 0., 0., 0.5, π/2, 2π, 2π, 0.0), N, Q)
+f = Flagellum(PlanarFlagellum(1., 0., 0.6, 0.5, π/2, -2π, 2π, 0.0), N, Q)
 
 
 # I've set things up so that you can run viz to visualise most objects
 
-fig1 = viz(f)
+fig1 = viz(f)   # hold the left mouse button to move the camera around
 
 # To solve the swimming problem (i.e. to calculate the rigid body velocity
 # U, angular velocity Ω and force distribution) we set up a SwimmingProblem
@@ -79,53 +79,50 @@ Colorbar(fig2[2,1], ar, vertical=false, label="force")
 x_points = range(-10.0, 11.0, 30)       # 30 equally spaced points between -10 and 11.0
 y_points = range(-10.5, 10.5, 30) 
 
-vf = VelocityField(
-    prob,            # The SwimmingProblem
-    x_points,         # x grid values
-    y_points,         # y grid values
-    0.                # constant z value (could be a vector of z values for 3D field)
-)
+u = FluidVelocity(prob)
+# stream plot
+stream(u, x_points, y_points)
+# arrow plot
+vf = PlanarVelocityField(prob, x_points, y_points)
+viz(vf)
 
-# Visualise in the same way as anything else, but here if you call viz you will get 3d axes,
-# to plot the xy projection call viz_xy on the velocity field
-set_theme!(theme_light())
-fig2 = viz_xy(vf)  
 
 # That was the velocity field at a particular time point. To see the average
 # velocity field, construct a TimeAveragedVelocityField.
 
-ave_vf = TimeAveragedVelocityField(
+ave_vf = TimeAveragedPlanarVelocityField(
     prob, 
     x_points, 
-    y_points, 
-    0.; 
+    y_points; 
     period=1.0,       # Since we set ω=2π the period is 1.0 time unit
-    num_ts=30         # The number of time slices to include in the average
+    num_t=30         # The number of time slices to include in the average
 )
 
 # Notice that the field is characteristic of a puller. What kinds of fields 
 # do you get for the other flagella defined above?
 
-fig3 = viz_xy(ave_vf)
+fig3 = stream(ave_vf)
 
 # Next let's see the swimming trajectory of the flagellum. To solve a time dependent
 # swimming problem, construct a SwimmingTrajectoryProblem
 
-tprob = SwimmingTrajectoryProblem(f, t_final=10.0, saveat=0.01) # solve for one period 100 pts per period
+tprob = SwimmingTrajectoryProblem(f, t_final=1.0, saveat=0.01) # solve for one period 100 pts per period
 solve_problem!(tprob, periodic=true)
 
 # The trajectory results are stored in tprob.traj
-viz_xy(tprob.traj)
-viz(tprob)
+lines(tprob.traj.x)
+viz(tprob)   # slide through the  trajectory
+
+
+
 # For a periodic trajectory you can continue the trajectory by adding copies onto the end
 
-continue_periodic_trajectory!(tprob.traj, 10) # continue for 10 periods
+traj = continue_periodic_trajectory(tprob.traj, 10) # continue for 10 periods
 
-viz_xy(tprob.traj)
+lines(traj.x)
 
 # Finally watch an animation by calling animate on the SwimmingTrajectoryProblem
-set_theme!(theme_dark())
-animate(tprob)
+animate(traj, f)
 
 
 ##########################################################################################
@@ -141,7 +138,7 @@ c = 1.0 # semi-minor axis
 N_body = 213 # number of force points
 Q_body = 917 # number of quadrature points
 
-body = EllipsoidBody(a, b, c, N, Q)
+body = CellBody(EllipsoidBody(a, b, c), N, Q)
 
 # Let's redefine the flagellum above, this time we will add a location where we want the flagellum to be attached
 
@@ -160,12 +157,22 @@ flg = Flagellate(
     [f]       # a list of flagella, with one element in this case
 )
 
+# average velocity field around the swimmer
+sprob = SwimmingProblem(flg)
+x_points = range(-10, 15,50)
+y_points = range(-10, 10, 50)
+ave_vf = TimeAveragedPlanarVelocityField(sprob, x_points, y_points)
+stream(ave_vf)
+
 tprob2 = SwimmingTrajectoryProblem(flg, t_final=1.0, saveat=0.02)
 solve_problem!(tprob2, periodic=true)
 
 # Again we continue the periodic trajectory to save unnecessary computation, and then animate
-continue_periodic_trajectory!(tprob2.traj, 20)
-animate(tprob2)
+traj = continue_periodic_trajectory(tprob2.traj, 20)
+animate(traj, flg)
+
+
+
 
 
 
