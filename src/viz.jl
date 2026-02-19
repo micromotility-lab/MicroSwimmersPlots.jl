@@ -151,7 +151,20 @@ function viz!(ax, B::Observable{FlagellateBuffer{T}}; bodycolor=Makie.wong_color
     end
 end
 
-viz(prob::SwimmingProblem) = viz(prob.microswimmer)
+function viz(prob::SwimmingProblem)
+    fig = Figure()
+    ax = Axis3(fig[1,1], aspect=:data)
+    B = viz!(ax, prob.microswimmer)
+    forces = get_forces(prob)
+    M = maximum(norm.(forces))
+    cs = [(Makie.wong_colors()[2], norm(f)/M) for f in forces]
+    L = prob.microswimmer.flagella[1].model.L
+    
+    ar = arrows2d!(ax, get_force_pts(prob), forces, color=cs, normalize=true, lengthscale=0.1*L)  # add quiver plot
+    # Colorbar(fig[2,1], ar, vertical=false, label="force")
+    display(fig)
+    B
+end
 
 function viz(prob::SwimmingTrajectoryProblem)
     fig = Figure()

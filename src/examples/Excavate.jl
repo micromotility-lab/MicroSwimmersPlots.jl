@@ -1,0 +1,160 @@
+using MicroSwimmers
+using MicroSwimmersPlots
+using GLMakie
+set_theme!(theme_dark())
+
+
+#############################################################################
+#### Grooved cell body ######################################################
+#############################################################################
+
+# For the body model, we use an EllipsoidalGroovedBody. This consists of an
+# ellipsoid with semi-axes
+
+a = 3.9  # um
+b = 2.2
+c = 2.2
+
+# from which we then subtract an ellipsoid with the same dimensions which is
+# shifted according to
+
+groove_center = [0., 0., 1.5]
+
+# Force points and quadrature points
+
+N_body = 157
+Q_body = 717 
+
+body = EllipsoidalGroovedBody(a, b, c, groove_center, N_body, Q_body)
+
+#############################################################################
+#### Flagella: 3D anterior and vaned posterior ##############################
+#############################################################################
+
+# The anterior flagellum has a complicated 3D beat pattern. We use the model
+# from Suzuki-Tellier et. al 2024 which has a planar beat superimposed on a
+# static out of plane curvature, called a QuasiPlanarFlagellum.
+
+anterior_model = QuasiPlanarFlagellum(
+    15.0,     # L: flagellum length in um
+    2π,       # ω: Beat frequency
+    1.00,     # A: Amplitude
+    0.1,      # δ: Amplitude modulation
+    12.5,     # λ: Wavelength
+    0.2,      # C: In-plane static curvature (swimming axis rotation)
+    -2.5      # C_z: Out-of-plane static curvature
+)
+
+N = 47
+Q = 111
+
+anterior_location = [-a, 0.0, 0.0]
+anterior_orientation = rotation_matrix([0, 1.0, 0.0], -2π/3) 
+
+anterior = Flagellum(
+    anterior_model, 
+    N, 
+    Q,
+    location=anterior_location,
+    orientation=anterior_orientation
+)
+
+# You can visualise how the flagellum depends on the parameters with the design
+# function (not implemented for every model yet). When you close the tool the 
+# flagellum will have the new parameters.
+
+# design(anterior)
+
+# For the posterior flagellum we can use the model from Suzuki-Tellier et. al 2024,
+# which I've called QuasiPlanarFlagellum
+
+posterior_model = QuasiPlanarFlagellum(
+    9.,  # L
+    4π,   # ω
+    0.6, # A
+    0.1, # δ
+    8.3, # λ
+    0.0, # C
+    0.0  # C_z
+)
+
+
+# Now instead of a regular Flagellum we build a VanedFlagellum
+N_f = 23          # number of force points in the flagellum
+Q_f = 117         # number of quadrature points in the flagellum
+N_v = 16          # number of force points in the vane
+N_start = 5       # force point to start the vane at (end point is N_start + N_v - 1)
+N_height = 2      # height of the vane point grid (in terms of force point spacing)
+
+# maximum x-value of the intersection of the two ellipsoids
+posterior_location = [-3.667, 0.0, 0.75]
+# make the posterior stick out of the groove slightly to avoid intersections
+posterior_orientation = rotation_matrix([0.0, 1.0, 0.0], -π/36)
+
+posterior = VanedFlagellum(
+    posterior_model,
+    N_f,
+    Q_f,
+    N_v,
+    N_start,
+    N_height,
+    location=posterior_location,
+    orientation=posterior_orientation
+)
+
+####################################################################################
+#### Building the excavate #########################################################
+####################################################################################
+
+# We're now ready to create the excavate
+
+excavate = Flagellate(
+    body,
+    [anterior, posterior]
+)
+
+
+# I haven't transferred the vane plotting code yet so it looks odd
+fig1 = viz(excavate)
+
+
+#####################################################################################
+#### Swimming #######################################################################
+#####################################################################################
+
+# Create the swimming trajectory problem to solve. The excavate designed above has
+# an anterior with a frequency of 1 unit and the posterior with a frequency of 2 units,
+# so you can do the trick of integrating to 1 and continuing. If you change the frequencies
+# to incommensurate values then integrate for longer.
+
+prob_swimming = SwimmingTrajectoryProblem(excavate, t_final=1.0, saveat=0.05)
+
+solve_problem!(prob_swimming, periodic=true)
+
+continue_periodic_trajectory!(prob_swimming.traj, 40)
+
+animate(prob_swimming)
+
+# Try changing the static curvature C of the anterior flagellum
+
+#####################################################################################
+#### Feeding ########################################################################
+#####################################################################################
+
+# A resistance problem fixes the microswimmer in place, so the total force and torque
+# are no longer zero. 
+
+# This will move the excavate back to the origin
+move_boundary!(excavate)
+
+rprob = ResistanceProblem(excavate)
+solve_problem!(rprob)
+
+F, T = total_force_and_torque(rprob)
+
+
+# Finally we can visualise particles in the flow generated by the feeder, this will 
+# take a few minutes to run
+prob_feeding = ParticleTrajectoryProblem(excavate, t_final=8.0)
+solve_problem!(prob_feeding)
+animate(prob_feeding, step=1)
