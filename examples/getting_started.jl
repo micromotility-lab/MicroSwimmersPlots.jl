@@ -159,12 +159,15 @@ flg = Flagellate(
 
 # average velocity field around the swimmer
 sprob = SwimmingProblem(flg)
+solve_problem!(sprob)
+viz(sprob)
+
 x_points = range(-10, 15,50)
 y_points = range(-10, 10, 50)
 ave_vf = TimeAveragedPlanarVelocityField(sprob, x_points, y_points)
 stream(ave_vf)
 
-tprob2 = SwimmingTrajectoryProblem(flg, t_final=1.0, saveat=0.02)
+tprob2 = SwimmingTrajectoryProblem(flg, t_final=1.0, saveat=0.05)
 solve_problem!(tprob2, periodic=true)
 
 # Again we continue the periodic trajectory to save unnecessary computation, and then animate

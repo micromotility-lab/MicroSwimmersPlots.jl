@@ -17,10 +17,11 @@ function animate(
     limits=nothing, 
     step=5,
     filename=nothing,
-    framerate=20,
+    framerate=30,
     compression=20,
     elevation=π/36, 
-    azimuth=π/4
+    azimuth=π/4,
+    fig_size=(1920, 1080)
 )
     ts = traj.t
     
@@ -39,7 +40,7 @@ function animate(
         )
     end
 
-    fig = Figure()
+    fig = Figure(size=fig_size)
     # ax = LScene(fig[1, 1])
     ax = Axis3(fig[1, 1], aspect=:data, limits=limits, elevation=elevation, azimuth=azimuth)
     obs = viz!(ax, microswimmer)
@@ -60,8 +61,8 @@ function animate(
         v = [
             -1. -1. 0.;
             -1.  1. 0.;
-            1.  1. 0.;
-            1. -1. 0.
+             1.  1. 0.;
+             1. -1. 0.
         ]
         f = [1 2 3; 3 4 1]
         mesh!(ax, v, f)

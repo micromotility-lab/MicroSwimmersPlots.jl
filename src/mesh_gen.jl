@@ -24,13 +24,24 @@ function cylinder(p, a, b, h, d)
     max(x^2/a^2 + y^2/b^2 - 1, -z-h, z - h)
 end
 
+plane(p, p0, n) = dot(p .- p0, n)
+
 function ellipsoidal_grooved_ellipsoid(p, a, b, c, g_a, g_b, g_c, d, R, k=50)
     smooth_max(ellipsoid(p, a, b, c), -shifted_rotated_ellipsoid(p, g_a, g_b, g_c, d, R), k)
+end
+
+function sliced_ellipsoidal_grooved_ellipsoid(
+    p, a, b, c, g_a, g_b, g_c, d, R, p0, n, k=50
+)
+    body_with_groove = ellipsoidal_grooved_ellipsoid(p, a, b, c, g_a, g_b, g_c, d, R, k)
+
+    max(body_with_groove, plane(p, p0, n))
 end
 
 function cylindrical_grooved_ellipsoid(p, a, b, c, g_a, g_b, h, d, k=50)
     smooth_max(ellipsoid(p, a, b, c), -cylinder(p, g_a, g_b, h, d), k)
 end
+
 
 function mesh_from_function(f::Function; origin=Vec3f(0., 0., 0), widths=Vec3f(1., 1., 1.), samples=(150,150,150))
     corner = origin + widths
@@ -55,6 +66,19 @@ function gen_mesh(body::EllipsoidBody)
         samples=(150,150,150)
     )
 end 
+
+function gen_mesh_sliced(body::EllipsoidalGroovedBody; p0=Point3f(0.), n=Vec3f(0., 0., 1.), samples=(150,150,150))
+    @unpack a, b, c, g_a, g_b, g_c, groove_center, orientation = body
+
+    mesh_from_function(
+        p -> sliced_ellipsoidal_grooved_ellipsoid(
+            p, a, b, c, g_a, g_b, g_c, groove_center, orientation, p0, n
+        ),
+        origin=Vec3f(-a, -b, -c),
+        widths=Vec3f(2a, 2b, 2c),
+        samples=samples
+    )
+end
 
 function gen_mesh(body::EllipsoidalGroovedBody)
     @unpack a, b, c, g_a, g_b, g_c, groove_center, orientation = body
