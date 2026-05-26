@@ -139,15 +139,6 @@ function get_buffer(flg::Flagellate)
     flagella_bufs = [get_buffer(f) for f in flg.flagella]
     FlagellateBuffer(body_buf, flagella_bufs)
 end
-
-# function update_buffer!(buf::FlagellateBuffer, flg::Flagellate, location=Point3f(flg.points.location), orientation=Mat3f(flg.points.orientation))
-#     update_buffer!(buf.body_buffer, flg.body, location, orientation)
-#     # update_pts!(buf.body_buffer.mesh.position, buf.body_buffer.ref_pts, Point3f(flg.points.location), Mat3f(flg.points.orientation))
-#     for (i,f) in enumerate(flg.flagella)
-#         fb = buf.flagella_buffers[i]
-#         update_buffer!(fb, f, Point3f(flg.points.location), Mat3f(flg.points.orientation))
-#     end
-# end
   
 function update_buffer!(buf::FlagellateBuffer, flg::Flagellate, 
     location=Point3f(flg.points.location), 
@@ -171,38 +162,7 @@ function viz!(ax, B::Observable{FlagellateBuffer{T}};
     end
 end
 
-# colonies
-struct ColonyBuffer{F <: FlagellateBuffer} <: PlotBuffer
-    flagellate_buffers::Vector{F}
-end
-
-function get_buffer(col::Colony)
-    flagellate_bufs = [get_buffer(flg) for flg in col.members]
-    ColonyBuffer(flagellate_bufs)
-end
-
-function update_buffer!(buf::ColonyBuffer, col::Colony,
-    location=Point3f(col.points.location),
-    orientation=Mat3f(col.points.orientation))
-    for (i, flg) in enumerate(col.members)
-        # compose: world = colony_transform * member_local_transform
-        member_location = location + orientation * Point3f(flg.points.location)
-        member_orientation = orientation * Mat3f(flg.points.orientation)
-        update_buffer!(buf.flagellate_buffers[i], flg, member_location, member_orientation)
-    end
-end
-function viz!(ax, B::Observable{ColonyBuffer{T}}; 
-    bodycolor=Makie.wong_colors()[1], 
-    linewidth=3, 
-    color=:forestgreen,
-    rasterize_body=true
-) where {T <: FlagellateBuffer}
-    # viz!(ax, @lift($B.body_buffer), color=bodycolor, rasterize=rasterize_body)
-    # mesh!(ax, @lift($B.body_buffer.mesh), color=bodycolor, rasterize=rasterize_body)
-    for i in eachindex(B[].flagellate_buffers)
-        viz!(ax, @lift($B.flagellate_buffers[i]); linewidth=linewidth, color=color)
-    end
-end
+# problems
 
 function viz!(ax, prob::SwimmingProblem; rasterize=1, step=1, kwargs...)
     B = viz!(ax, prob.microswimmer; rasterize_body=rasterize, kwargs...)
@@ -236,20 +196,6 @@ viz(prob::SwimmingProblem; kwargs...) = begin
     fig
 end
 
-# function viz(prob::SwimmingProblem)
-#     ax = Axis3(fig[1,1], aspect=:data)
-#     B = viz!(ax, prob.microswimmer)
-#     forces = get_forces(prob)
-#     M = maximum(norm.(forces))
-#     cs = [(Makie.wong_colors()[2], norm(f)/M) for f in forces]
-#     L = prob.microswimmer.flagella[1].model.L
-    
-#     ar = arrows2d!(ax, get_force_pts(prob), forces, color=cs, normalize=true, lengthscale=0.1*L)  # add quiver plot
-#     # Colorbar(fig[2,1], ar, vertical=false, label="force")
-#     display(fig)
-#     B
-# end
-
 function viz(prob::SwimmingTrajectoryProblem)
     fig = Figure()
     ax = Axis3(fig[1,1], aspect=:data)
@@ -266,22 +212,12 @@ end
 
 # Velocity fields
 
-
-
 @inline function _proj2(plane::Symbol, x)
     plane === :xy && return Point2f(x[1], x[2])
     plane === :xz && return Point2f(x[1], x[3])
     plane === :yz && return Point2f(x[2], x[3])
     throw(ArgumentError("plane must be :xy, :xz, or :yz"))
 end
-
-# @inline function _slice3(plane::Symbol, a::Real, b::Real, c::Real)
-#     # given (a,b) in plane coordinates and fixed c, return 3D point
-#     plane === :xy && return (a, b, c)
-#     plane === :xz && return (a, c, b)
-#     plane === :yz && return (c, a, b)
-#     throw(ArgumentError("plane must be :xy, :xz, or :yz"))
-# end
 
 @inline function _labels(plane::Symbol)
     plane === :xy && return (L"x \, (\mu\mathrm{m})", L"y \, (\mu\mathrm{m})")
@@ -308,57 +244,6 @@ function viz(vf::PlanarVelocityField; fig = Figure())
     fig
 end
 
-# function stream!(parent, vf::PlanarVelocityField; 
-#     show_colorbar=true, 
-#     stream_kwargs=(;arrow_size=10, linewidth=1.5, rasterize=1),
-#     hm_kwargs=(;rasterize=1),
-
-# )
-#     g = parent isa GridLayout ? parent : GridLayout(parent)
-#     @unpack plane, a_range, b_range, c, velocities = vf
-#     ind = plane === :xy ? (1,2) : (plane === :xz ? (1,3) : (2,3))
-#     n1, n2 = length(a_range), length(b_range)
-#     U = reshape(getindex.(velocities, ind[1]), n1, n2)
-#     V = reshape(getindex.(velocities, ind[2]), n1, n2)
-
-#     itp_u = interpolate((a_range, b_range), U, Gridded(Linear()))
-#     itp_v = interpolate((a_range, b_range), V, Gridded(Linear()))
-
-#     # Continuous velocity function
-#     u_func(x, y) = Point2(itp_u(x, y), itp_v(x, y))
-
-#     # vel_mag = sqrt.(U.^2 .+ V.^2)
-#     # vel_mag = [norm(u_func(x,y)) for x in range(a_range[1], a_range[end], 300), y in range(b_range[1], b_range[end], 300)]
-   
-    # vel_mag_raw = sqrt.(U.^2 .+ V.^2)  # compute at original grid points
-    # itp_mag = interpolate((a_range, b_range), vel_mag_raw, Gridded(Linear()))
-    # a_itp = range(a_range[1], a_range[end], 300)
-    # b_itp = range(b_range[1], b_range[end], 300)
-    # vel_mag = [itp_mag(x, y) for x in a_itp, y in b_itp]
-        
-#     (xl, yl) = _labels(plane)
-#     ax = Axis(g[1,1], xlabel=xl, ylabel=yl, aspect=DataAspect())
-#     hm = heatmap!(ax, a_itp, b_itp, vel_mag; hm_kwargs...)  # colorrange=(vmin, vmax))
-#     streamplot!(ax, u_func, 
-#         [minimum(a_range), maximum(a_range)], 
-#         [minimum(b_range), maximum(b_range)]; 
-#         color = c -> :white, 
-#         maxsteps=20000,
-#         stream_kwargs...
-#     )
-#     if show_colorbar
-#         Colorbar(g[1, 2], hm, width=5)
-#         a = (b_range[end] - b_range[1]) / (a_range[end] - a_range[1])
-#         rowsize!(g, 1, Aspect(1, a))
-#         # Label(g[1,2,Top()], L"v \, (\mu\mathrm{m/beat})")
-#         Label(g[1,2,Top()], L"v \, (\mu\mathrm{m/sec})")
-#         colgap!(g, 5)
-#     end
-#     # colsize!(fig.layout, 1, Aspect(1, 1.0))
-#     # rowsize!(fig.layout, 1, Aspect(1, 1.0))
-#     ax
-# end
-
 function stream!(parent, vf::PlanarVelocityField;
     show_colorbar=true,
     in_domain=(x, z) -> true,
@@ -373,7 +258,6 @@ function stream!(parent, vf::PlanarVelocityField;
     V = reshape(getindex.(velocities, ind[2]), n1, n2)
 
     # Mask outside domain
-
     vel_mag_raw = sqrt.(U.^2 .+ V.^2)  # compute at original grid points
     itp_mag = interpolate((a_range, b_range), vel_mag_raw, Gridded(Linear()))
     a_itp = range(a_range[1], a_range[end], 300)
@@ -398,9 +282,6 @@ function stream!(parent, vf::PlanarVelocityField;
         Point2(u, v)
     end
 
-    # u_func(x, z) = in_domain(x, z) ?
-    #     Point2(itp_u(x, z), itp_v(x, z)) :
-    #     Point2(0.0, 0.0)
 
     (xl, yl) = _labels(plane)
     ax = Axis(g[1,1], xlabel=xl, ylabel=yl, aspect=DataAspect())
@@ -455,61 +336,6 @@ stream(fv::FluidVelocity,
         PlanarVelocityField(fv, a_range, b_range; c=c, plane=plane); 
         kwargs...
 )
-
-# function vorticity!(parent, vf::PlanarVelocityField;
-#     show_colorbar=true,
-#     method=:interpolant,  # :interpolant or :finitediff
-#     colorrange=nothing,
-#     show_streamlines=true,
-#     stream_kwargs=(; arrow_size=10, linewidth=1.5, rasterize=1),
-#     hm_kwargs=(; rasterize=1),
-# )
-#     g = parent isa GridLayout ? parent : GridLayout(parent)
-#     @unpack plane, a_range, b_range, c, velocities = vf
-#     ind = plane === :xy ? (1,2) : (plane === :xz ? (1,3) : (2,3))
-#     n1, n2 = length(a_range), length(b_range)
-#     U = reshape(getindex.(velocities, ind[1]), n1, n2)
-#     V = reshape(getindex.(velocities, ind[2]), n1, n2)
-
-#     itp_u = interpolate((a_range, b_range), U, Gridded(Linear()))
-#     itp_v = interpolate((a_range, b_range), V, Gridded(Linear()))
-
-#     ω = if method === :interpolant
-#         _vorticity_interpolant(itp_u, itp_v, a_range, b_range)
-#     else
-#         _vorticity_finitediff(U, V, a_range, b_range)
-#     end
-
-#     ω_max = isnothing(colorrange) ? maximum(abs, ω) : colorrange
-#     (xl, yl) = _labels(plane)
-#     ax = Axis(g[1,1], xlabel=xl, ylabel=yl, aspect=DataAspect())
-#     hm = heatmap!(ax, a_range, b_range, ω;
-#         colormap=:RdBu,
-#         colorrange=(-ω_max, ω_max),
-#         hm_kwargs...
-#     )
-
-#     if show_streamlines
-#         u_func(x, y) = Point2(itp_u(x, y), itp_v(x, y))
-#         streamplot!(ax, u_func,
-#             [minimum(a_range), maximum(a_range)],
-#             [minimum(b_range), maximum(b_range)];
-#             color=c -> :black,
-#             maxsteps=20000,
-#             stream_kwargs...
-#         )
-#     end
-
-#     if show_colorbar
-#         Colorbar(g[1,2], hm, width=5)
-#         a = (b_range[end] - b_range[1]) / (a_range[end] - a_range[1])
-#         rowsize!(g, 1, Aspect(1, a))
-#         Label(g[1,2,Top()], L"\omega \, (\mathrm{s}^{-1})")
-#         colgap!(g, 5)
-#     end
-#     ax
-# end
-
 
 
 function vorticity!(parent, vf::PlanarVelocityField;
@@ -594,48 +420,16 @@ function _vorticity_interpolant(itp_u, itp_v, a_range, b_range)
     ]
 end
 
-function _vorticity_finitediff(U, V, a_range, b_range)
-    dx = diff(a_range)
-    dz = diff(b_range)
-    dVdx = similar(V)
-    dUdz = similar(U)
-
-    # dV/dx
-    for j in axes(V, 2)
-        dVdx[1, j]   = (V[2, j]   - V[1, j])   / dx[1]
-        dVdx[end, j] = (V[end, j] - V[end-1, j]) / dx[end]
-        for i in 2:size(V, 1)-1
-            dVdx[i, j] = (V[i+1, j] - V[i-1, j]) / (dx[i-1] + dx[i])
-        end
-    end
-
-    # dU/dz
-    for i in axes(U, 1)
-        dUdz[i, 1]   = (U[i, 2]   - U[i, 1])   / dz[1]
-        dUdz[i, end] = (U[i, end] - U[i, end-1]) / dz[end]
-        for j in 2:size(U, 2)-1
-            dUdz[i, j] = (U[i, j+1] - U[i, j-1]) / (dz[j-1] + dz[j])
-        end
-    end
-
-    dVdx .- dUdz
-end
-    
-
 ## Trajectories
 
 function viz(traj::Trajectory; step=1)
     fig = Figure()
     ax = Axis3(fig[1,1], aspect=:data)
-    # b3 = cross.(traj.b1, traj.b2)
     lines!(ax, traj.x, color=:red)
-    # spacing = norm(traj.x[1] - traj.x[2])
-    # @info "" spacing
-    # arrows3d!(ax, traj.x[1:step:end], traj.b1[1:step:end], normalize=true, lengthscale=step*spacing)
-    # arrows3d!(ax, traj.x[1:step:end], traj.b2[1:step:end], normalize=true, lengthscale=step*spacing)
     fig
 end
 
+# xy projection of trajectory
 function viz_xy(traj::Trajectory)
     fig = Figure()
     ax = Axis(fig[1,1], aspect=DataAspect())
