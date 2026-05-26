@@ -53,10 +53,6 @@ function animate(
         update_buffer_observable!(obs, microswimmer)
     end
 
-    # pts = @lift(get_points($s))
-    # scatter!(ax, @lift(Point3f.(eachcol($s.config.quad_pts))), markersize=5)
-
-    # lines!(ax, Point3f.(eachcol(X0)), color=:red, linewidth=0.5, linestyle=:dash)
     if wall
         v = [
             -1. -1. 0.;
@@ -96,9 +92,9 @@ function animate(
     wall=false, 
     limits=(-5., 5., -5., 5., -5., 5.), 
     step=5,
+    traj_length=600,
     filename=nothing,
     framerate=20,
-    traj_length=600,
     elevation=π/6, 
     azimuth=π/4,
     num_particles=nothing
@@ -107,14 +103,9 @@ function animate(
     num_particles = isnothing(num_particles) ? size(traj,1) ÷ 3 : num_particles
 
     particle_trajectories = [@lift(traj[3i-2:3i, max(1, $t-traj_length):$t]) for i in 1:num_particles]
-    c = to_color(:purple)
-    tailcol = [RGBAf(c.r, c.g, c.b, (i/traj_length)^2) for i in 1:traj_length]
-
-
 
     fig = Figure()
     ax = Axis3(fig[1, 1], aspect=:data, limits=limits, elevation=elevation, azimuth=azimuth)
-    # ax = LScene(fig[1, 1])
     obs = viz!(ax, microswimmer)
 
 
@@ -138,10 +129,8 @@ function animate(
     
     on(t) do i
         update_boundary!(microswimmer, ts[i])
-        update_buffer!(obs[], microswimmer)
-        notify(obs)
+        update_buffer_observable!(obs, microswimmer)
     end
-
     if isnothing(filename)
         for i in 1:step:length(ts)
             t[] = i
