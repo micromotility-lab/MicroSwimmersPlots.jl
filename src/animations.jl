@@ -21,7 +21,8 @@ function animate(
     compression=20,
     elevation=π/36, 
     azimuth=π/4,
-    fig_size=(1920, 1080)
+    fig_size=(1920, 1080),
+    kwargs...
 )
     ts = traj.t
     
@@ -29,7 +30,7 @@ function animate(
     T = @lift(traj.x[1:$t])
 
     if isnothing(limits)
-        r_max = maximum(norm, microswimmer.points.force_pts)
+        r_max = maximum(norm(x) for p in microswimmer.parts for x in p.disc.force_pts)
         xs = getindex.(traj.x, 1)
         ys = getindex.(traj.x, 2)
         zs = getindex.(traj.x, 3)
@@ -43,13 +44,15 @@ function animate(
     fig = Figure(size=fig_size)
     # ax = LScene(fig[1, 1])
     ax = Axis3(fig[1, 1], aspect=:data, limits=limits, elevation=elevation, azimuth=azimuth)
-    obs = viz!(ax, microswimmer)
+    obs = viz!(ax, microswimmer; kwargs...)
     lines!(ax, T, color=:red, linewidth=0.5)
     yield()
     display(fig)
     
     on(t) do i
-        move_boundary!(microswimmer, traj.x[i], traj.b1[i], traj.b2[i], ts[i])
+        b1v, b2v = SVector{3}(traj.b1[i]), SVector{3}(traj.b2[i])
+        microswimmer.frame = Frame(SVector{3}(traj.x[i]), SMatrix{3,3}(hcat(b1v, b2v, cross(b1v, b2v))))
+        update_boundary!(microswimmer, ts[i])
         update_buffer_observable!(obs, microswimmer)
     end
 
@@ -88,7 +91,7 @@ animate(prob::SwimmingTrajectoryProblem; kwargs...) = animate(
 )
 
 
-"""Animate particle trajectories in a flow, NEEDS UPDATING"""
+"""Animate particle trajectories in a flow"""
 function animate(
     ts::Vector,
     traj::Matrix,
@@ -148,7 +151,7 @@ function animate(
             sleep(0.05)
         end
     else
-        record(fig, filename, 1:length(ts); framerate=framerate) do i 
+        record(fig, filename, 1:step:length(ts); framerate=framerate) do i 
             t[] = i
         end 
     end

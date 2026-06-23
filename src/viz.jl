@@ -12,7 +12,13 @@ end
 function update_pts!(out_vec::Vector{Point3f}, in_vec::Matrix{<:Number}, location::Point3f=Point3f(0.), orientation::Mat3f=I3f)
     @inbounds for i in axes(in_vec, 2)
         out_vec[i] = location + orientation*Point3f(@view in_vec[:,i])
-    end 
+    end
+end
+
+function update_pts!(out_vec::Vector{Point3f}, in_vec::AbstractVector{<:AbstractVector}, location::Point3f=Point3f(0.), orientation::Mat3f=I3f)
+    @inbounds for i in eachindex(in_vec)
+        out_vec[i] = location + orientation * Point3f(in_vec[i])
+    end
 end
 
 function update_buffer_observable!(B::Observable{P}, fb::FluidBoundary) where {P <: PlotBuffer}
@@ -54,21 +60,21 @@ mutable struct CellBodyBuffer <: PlotBuffer
     ref_pts::Vector{Point3f}
 end
 
-function get_buffer(body::CellBody,; slice=false)
-    mesh = slice ? gen_mesh_sliced(body.model) : gen_mesh(body.model)
+function get_buffer(part::Part{<:CellBodyModel}; slice=false)
+    mesh = slice ? gen_mesh_sliced(part.model) : gen_mesh(part.model)
     ref_pts = copy(coordinates(mesh))
     CellBodyBuffer(mesh, ref_pts)
 end
 
-function update_buffer!(buf::CellBodyBuffer, body::CellBody, location=Point3f(0.), orientation=I3f)
-    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(body.points.location), Mat3f(body.points.orientation))
+function update_buffer!(buf::CellBodyBuffer, part::Part{<:CellBodyModel}, location=Point3f(0.), orientation=I3f)
+    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(part.frame.location), Mat3f(part.frame.orientation))
     update_pts!(buf.mesh.position, buf.mesh.position, location, orientation)
 end
 
-function update_mesh!(buf::CellBodyBuffer, body::CellBody, location::Point3f=Point3f(0.), orientation::Mat3f=I3f)
-    buf.mesh = gen_mesh(body.model)
+function update_mesh!(buf::CellBodyBuffer, part::Part{<:CellBodyModel}, location::Point3f=Point3f(0.), orientation::Mat3f=I3f)
+    buf.mesh = gen_mesh(part.model)
     buf.ref_pts = copy(coordinates(buf.mesh))
-    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(body.points.location), Mat3f(body.points.orientation))
+    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(part.frame.location), Mat3f(part.frame.orientation))
     update_pts!(buf.mesh.position, buf.mesh.position, location, orientation)
 end
 
@@ -80,10 +86,10 @@ struct BareFlagellumBuffer <: FlagellumBuffer
     pts::Vector{Point3f}
 end
 
-get_buffer(f::BareFlagellum) = BareFlagellumBuffer(Vector{Point3f}(undef, f.points.Q))
+get_buffer(f::Part{<:FlagellumModel}) = BareFlagellumBuffer(Vector{Point3f}(undef, nq(f.disc)))
 
-function update_buffer!(buf::BareFlagellumBuffer, f::BareFlagellum, location=Point3f(0.), orientation=I3f)
-    update_pts!(buf.pts, f.points.quad_pts, Point3f(f.points.location), Mat3f(f.points.orientation))
+function update_buffer!(buf::BareFlagellumBuffer, f::Part{<:FlagellumModel}, location=Point3f(0.), orientation=I3f)
+    update_pts!(buf.pts, f.disc.quad_pts, Point3f(f.frame.location), Mat3f(f.frame.orientation))
     update_pts!(buf.pts, buf.pts, Point3f(location), Mat3f(orientation))
 end
 
@@ -91,128 +97,57 @@ function viz!(ax, B::Observable{BareFlagellumBuffer}; linewidth=3, color=:forest
     lines!(ax, @lift($B.pts), linewidth=linewidth, color=color)
 end
 
-struct VanedFlagellumBuffer <: FlagellumBuffer
-    flagellum_pts::Vector{Point3f}
-    vane_pts::Vector{Point3f}
-    vane_x::Matrix{Float32}
-    vane_y::Matrix{Float32}
-    vane_z::Matrix{Float32}
+# MicroSwimmer
+
+struct MicroSwimmerBuffer <: PlotBuffer
+    body_buffers::Vector{CellBodyBuffer}
+    flagellum_buffers::Vector{BareFlagellumBuffer}
 end
 
-get_buffer(vf::VanedFlagellum) = VanedFlagellumBuffer(
-    Vector{Point3f}(undef, vf.N_f),
-    Vector{Point3f}(undef, vf.N_v*(vf.N_height+1)),
-    Matrix{Float32}(undef, vf.N_v, vf.N_height + 1),
-    Matrix{Float32}(undef, vf.N_v, vf.N_height + 1),
-    Matrix{Float32}(undef, vf.N_v, vf.N_height + 1)
+function get_buffer(ms::MicroSwimmer)
+    body_bufs = [get_buffer(p) for p in ms.parts if p.model isa CellBodyModel]
+    flag_bufs = [get_buffer(p) for p in ms.parts if p.model isa FlagellumModel]
+    MicroSwimmerBuffer(body_bufs, flag_bufs)
+end
+
+function update_buffer!(buf::MicroSwimmerBuffer, ms::MicroSwimmer,
+    location=Point3f(ms.frame.location),
+    orientation=Mat3f(ms.frame.orientation))
+    body_parts = filter(p -> p.model isa CellBodyModel, ms.parts)
+    flag_parts = filter(p -> p.model isa FlagellumModel, ms.parts)
+    for (i, p) in enumerate(body_parts)
+        update_buffer!(buf.body_buffers[i], p, location, orientation)
+    end
+    for (i, p) in enumerate(flag_parts)
+        update_buffer!(buf.flagellum_buffers[i], p, location, orientation)
+    end
+end
+
+function viz!(ax, B::Observable{MicroSwimmerBuffer};
+    bodycolor=Makie.wong_colors()[1],
+    linewidth=3,
+    color=:forestgreen,
+    rasterize_body=true
 )
-
-function update_buffer!(buf::VanedFlagellumBuffer, vf::VanedFlagellum, location::Point3f=Point3f(0.), orientation::Mat3f=I3f)
-    update_pts!(buf.flagellum_pts, vf.points.force_pts[:, 1:vf.N_f], Point3f(vf.points.location), Mat3f(vf.points.orientation))
-    update_pts!(buf.flagellum_pts, buf.flagellum_pts, location, orientation)
-    update_pts!(buf.vane_pts, get_vane_pts(vf), Point3f(vf.points.location), Mat3f(vf.points.orientation))
-    update_pts!(buf.vane_pts, buf.vane_pts, location, orientation)
-    for i in eachindex(buf.vane_pts)
-        buf.vane_x[i] = buf.vane_pts[i][1]
-        buf.vane_y[i] = buf.vane_pts[i][2]
-        buf.vane_z[i] = buf.vane_pts[i][3]
+    for i in eachindex(B[].body_buffers)
+        viz!(ax, @lift($B.body_buffers[i]); color=bodycolor, rasterize=rasterize_body)
+    end
+    for i in eachindex(B[].flagellum_buffers)
+        viz!(ax, @lift($B.flagellum_buffers[i]); linewidth=linewidth, color=color)
     end
 end
 
-function viz!(ax, B::Observable{VanedFlagellumBuffer}; linewidth=3, color=:forestgreen)
-    lines!(ax, @lift($B.flagellum_pts), linewidth=linewidth, color=color)
-    surface!(ax,
-        @lift($B.vane_x), @lift($B.vane_y), @lift($B.vane_z),
-        colormap=:RdPu
-    )
-end
-
-# Flagellate
-
-struct FlagellateBuffer{F <: FlagellumBuffer} <: PlotBuffer
-    body_buffer::CellBodyBuffer
-    flagella_buffers::Vector{F}
-end
-
-function get_buffer(flg::Flagellate)
-    body_buf = get_buffer(flg.body)
-    flagella_bufs = [get_buffer(f) for f in flg.flagella]
-    FlagellateBuffer(body_buf, flagella_bufs)
-end
-
-# function update_buffer!(buf::FlagellateBuffer, flg::Flagellate, location=Point3f(flg.points.location), orientation=Mat3f(flg.points.orientation))
-#     update_buffer!(buf.body_buffer, flg.body, location, orientation)
-#     # update_pts!(buf.body_buffer.mesh.position, buf.body_buffer.ref_pts, Point3f(flg.points.location), Mat3f(flg.points.orientation))
-#     for (i,f) in enumerate(flg.flagella)
-#         fb = buf.flagella_buffers[i]
-#         update_buffer!(fb, f, Point3f(flg.points.location), Mat3f(flg.points.orientation))
-#     end
-# end
-  
-function update_buffer!(buf::FlagellateBuffer, flg::Flagellate, 
-    location=Point3f(flg.points.location), 
-    orientation=Mat3f(flg.points.orientation))
-    update_buffer!(buf.body_buffer, flg.body, location, orientation)
-    for (i, f) in enumerate(flg.flagella)
-        update_buffer!(buf.flagella_buffers[i], f, location, orientation)
-    end
-end
-
-function viz!(ax, B::Observable{FlagellateBuffer{T}}; 
-    bodycolor=Makie.wong_colors()[1], 
-    linewidth=3, 
-    color=:forestgreen,
-    rasterize_body=true
-) where {T <: FlagellumBuffer}
-    viz!(ax, @lift($B.body_buffer), color=bodycolor, rasterize=rasterize_body)
-    # mesh!(ax, @lift($B.body_buffer.mesh), color=bodycolor, rasterize=rasterize_body)
-    for i in eachindex(B[].flagella_buffers)
-        viz!(ax, @lift($B.flagella_buffers[i]); linewidth=linewidth, color=color)
-    end
-end
-
-# colonies
-struct ColonyBuffer{F <: FlagellateBuffer} <: PlotBuffer
-    flagellate_buffers::Vector{F}
-end
-
-function get_buffer(col::Colony)
-    flagellate_bufs = [get_buffer(flg) for flg in col.members]
-    ColonyBuffer(flagellate_bufs)
-end
-
-function update_buffer!(buf::ColonyBuffer, col::Colony,
-    location=Point3f(col.points.location),
-    orientation=Mat3f(col.points.orientation))
-    for (i, flg) in enumerate(col.members)
-        # compose: world = colony_transform * member_local_transform
-        member_location = location + orientation * Point3f(flg.points.location)
-        member_orientation = orientation * Mat3f(flg.points.orientation)
-        update_buffer!(buf.flagellate_buffers[i], flg, member_location, member_orientation)
-    end
-end
-function viz!(ax, B::Observable{ColonyBuffer{T}}; 
-    bodycolor=Makie.wong_colors()[1], 
-    linewidth=3, 
-    color=:forestgreen,
-    rasterize_body=true
-) where {T <: FlagellateBuffer}
-    # viz!(ax, @lift($B.body_buffer), color=bodycolor, rasterize=rasterize_body)
-    # mesh!(ax, @lift($B.body_buffer.mesh), color=bodycolor, rasterize=rasterize_body)
-    for i in eachindex(B[].flagellate_buffers)
-        viz!(ax, @lift($B.flagellate_buffers[i]); linewidth=linewidth, color=color)
-    end
-end
+# problems
 
 function viz!(ax, prob::SwimmingProblem; rasterize=1, step=1, kwargs...)
     B = viz!(ax, prob.microswimmer; rasterize_body=rasterize, kwargs...)
-    N = prob.microswimmer.body.points.N
-    forces = get_forces(prob)[N+1:step:end]
-    force_pts = get_force_pts(prob)[N+1:step:end]
-    # M = maximum(norm.(forces))
+    N_body = sum(nf(p.disc) for p in prob.microswimmer.parts if p.model isa CellBodyModel; init=0)
+    forces = get_forces(prob)[N_body+1:step:end]
+    force_pts = get_force_pts(prob)[N_body+1:step:end]
     Fmag = norm.(forces)
-    Fmax = maximum(Fmag)    
-    L = prob.microswimmer.flagella[1].model.L
+    Fmax = maximum(Fmag)
+    flag_idx = findfirst(p -> p.model isa FlagellumModel, prob.microswimmer.parts)
+    L = isnothing(flag_idx) ? 1.0 : prob.microswimmer.parts[flag_idx].model.L
 
     ar = arrows2d!(
         ax,

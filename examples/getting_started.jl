@@ -14,8 +14,8 @@ set_theme!(theme_light())
 
 model = PlanarFlagellum(
     1.,    #  L: Length of the flagellum (um)
-    0.,    #  C: Static curvature 
-    0.3,   #  R₀: Amplitude/envelope magnitude 
+    0.,    #  C: Static curvature
+    0.3,   #  R₀: Amplitude/envelope magnitude
     0.15,  #  R₁: Spatial modulation of amplitude
     2π,    #  k: wavenumber of envelope modulation
     2π,    #  ϕ: wavenumber of travelling wave
@@ -23,33 +23,30 @@ model = PlanarFlagellum(
     0.0    #  δ: overall phase (for multiple flagella)
 )
 
-# Next we construct a discretised Flagellum structure and apply our model
+# Next we construct a discretised Part and apply our model
 
 N = 23    # force points
-Q = 127   # quadrature points Q > 4N
+Q = 127   # quadrature points
 
-f = Flagellum(
-    model,       # model: the model we defined above,
-    N,             # N: number of force points
-    Q              # Q: number of quadrature points
-)
+f = Part(model, N, Q)
 
 # Some alternative flagella beating envelopes changing R₀, R₁ and k
 
-f = Flagellum(PlanarFlagellum(1., 0., 0.6, 0., 2π, 2π, 2π, 0.0), N, Q) 
-f = Flagellum(PlanarFlagellum(1., 0., 1.3, 0., 2π, 2π, 2π, 0.0), N, Q)
-f = Flagellum(PlanarFlagellum(1., 0., 0., 0.5, π/2, 2π, 2π, 0.0), N, Q)
-f = Flagellum(PlanarFlagellum(1., 0., 0.6, 0.5, π/2, -2π, 2π, 0.0), N, Q)
+f = Part(PlanarFlagellum(1., 0., 0.6, 0., 2π, 2π, 2π, 0.0), N, Q)
+f = Part(PlanarFlagellum(1., 0., 1.3, 0., 2π, 2π, 2π, 0.0), N, Q)
+f = Part(PlanarFlagellum(1., 0., 0., 0.5, π/2, 2π, 2π, 0.0), N, Q)
+f = Part(PlanarFlagellum(1., 0., 0.6, 0.5, π/2, -2π, 2π, 0.0), N, Q)
 
+ms = MicroSwimmer([f])
 
 # I've set things up so that you can run viz to visualise most objects
 
-fig1 = viz(f)   # hold the left mouse button to move the camera around
+fig1 = viz(ms)   # hold the left mouse button to move the camera around
 
 # To solve the swimming problem (i.e. to calculate the rigid body velocity
 # U, angular velocity Ω and force distribution) we set up a SwimmingProblem
 
-prob = SwimmingProblem(f)
+prob = SwimmingProblem(ms)
 
 # This didn't solve the problem yet, we need to call solve_problem!
 
@@ -62,14 +59,14 @@ U = get_U(prob)
 Ω = get_Ω(prob)
 forces = get_forces(prob)
 
-# Check that the total force and torque is zero 
+# Check that the total force and torque is zero
 
-F, T = total_force_and_torque(prob)  
- 
+F, T = total_force_and_torque(prob)
+
 # Plot the force distribution on the fluid due to the flagellum
 fig2 = Figure()
 ax = Axis(fig2[1,1], aspect=DataAspect())   # DataAspect draws equal axes
-viz!(ax, f)                               # add the flagellum to the plot
+viz!(ax, ms)                               # add the flagellum to the plot
 ar = arrows2d!(ax, get_force_pts(prob), forces, color=norm.(forces), normalize=true, lengthscale=0.1)  # add quiver plot
 arrows2d!(ax, Point3f(0.), U, color=:red)
 Colorbar(fig2[2,1], ar, vertical=false, label="force")
@@ -77,7 +74,7 @@ Colorbar(fig2[2,1], ar, vertical=false, label="force")
 # We can also get the velocity field at some predefined points in the x-y plane
 
 x_points = range(-10.0, 11.0, 30)       # 30 equally spaced points between -10 and 11.0
-y_points = range(-10.5, 10.5, 30) 
+y_points = range(-10.5, 10.5, 30)
 
 u = FluidVelocity(prob)
 # stream plot
@@ -88,17 +85,17 @@ viz(vf)
 
 
 # That was the velocity field at a particular time point. To see the average
-# velocity field, construct a TimeAveragedVelocityField.
+# velocity field, construct a TimeAveragedPlanarVelocityField.
 
 ave_vf = TimeAveragedPlanarVelocityField(
-    prob, 
-    x_points, 
-    y_points; 
+    prob,
+    x_points,
+    y_points;
     period=1.0,       # Since we set ω=2π the period is 1.0 time unit
     num_t=30         # The number of time slices to include in the average
 )
 
-# Notice that the field is characteristic of a puller. What kinds of fields 
+# Notice that the field is characteristic of a puller. What kinds of fields
 # do you get for the other flagella defined above?
 
 fig3 = stream(ave_vf)
@@ -106,12 +103,12 @@ fig3 = stream(ave_vf)
 # Next let's see the swimming trajectory of the flagellum. To solve a time dependent
 # swimming problem, construct a SwimmingTrajectoryProblem
 
-tprob = SwimmingTrajectoryProblem(f, t_final=1.0, saveat=0.01) # solve for one period 100 pts per period
+tprob = SwimmingTrajectoryProblem(ms, t_final=1.0, saveat=0.01) # solve for one period, 100 pts per period
 solve_problem!(tprob, periodic=true)
 
 # The trajectory results are stored in tprob.traj
 lines(tprob.traj.x)
-viz(tprob)   # slide through the  trajectory
+viz(tprob)   # slide through the trajectory
 
 
 
@@ -122,7 +119,7 @@ traj = continue_periodic_trajectory(tprob.traj, 10) # continue for 10 periods
 lines(traj.x)
 
 # Finally watch an animation by calling animate on the SwimmingTrajectoryProblem
-animate(traj, f)
+animate(traj, ms)
 
 
 ##########################################################################################
@@ -131,54 +128,42 @@ animate(traj, f)
 
 # Now we will create a cell body and attach a flagellum. We'll make a sphere of diameter 2um
 
-a = 1.0 # semi-major axis 
+a = 1.0 # semi-major axis
 b = 1.0 # semi-minor axis
-c = 1.0 # semi-minor axis 
+c = 1.0 # semi-minor axis
 
 N_body = 213 # number of force points
 Q_body = 917 # number of quadrature points
 
-body = CellBody(EllipsoidBody(a, b, c), N, Q)
+body = Part(EllipsoidBody(a, b, c), N_body, Q_body)
 
 # Let's redefine the flagellum above, this time we will add a location where we want the flagellum to be attached
 
-f = Flagellum(
+f = Part(
     PlanarFlagellum(10., 0., 0.6, 0.5, π/2, 2π, 2π, 0.0),
     N,
     Q,
-    location=[1.0, 0.0, 0.0],                         # connect to the edge on the x-axis 
-    orientation=rotation_matrix([1.0, 0., 0.], 0.0)   # you can also change the orientation using rotation_matrix(axis, angle) 
+    location=[1.0, 0.0, 0.0],                         # connect to the edge on the x-axis
+    orientation=rotation_matrix([1.0, 0., 0.], 0.0)   # you can also change the orientation using rotation_matrix(axis, angle)
 )
 
-# Put the body and flagellum together into a Flagellate structure
+# Put the body and flagellum together into a MicroSwimmer
 
-flg = Flagellate(
-    body,
-    [f]       # a list of flagella, with one element in this case
-)
+ms = MicroSwimmer([body, f])
 
 # average velocity field around the swimmer
-sprob = SwimmingProblem(flg)
+sprob = SwimmingProblem(ms)
 solve_problem!(sprob)
 viz(sprob)
 
-x_points = range(-10, 15,50)
+x_points = range(-10, 15, 50)
 y_points = range(-10, 10, 50)
-ave_vf = TimeAveragedPlanarVelocityField(sprob, x_points, y_points)
+ave_vf = TimeAveragedPlanarVelocityField(sprob, x_points, y_points; period=1.0, num_t=30)
 stream(ave_vf)
 
-tprob2 = SwimmingTrajectoryProblem(flg, t_final=1.0, saveat=0.05)
+tprob2 = SwimmingTrajectoryProblem(ms, t_final=1.0, saveat=0.05)
 solve_problem!(tprob2, periodic=true)
 
 # Again we continue the periodic trajectory to save unnecessary computation, and then animate
 traj = continue_periodic_trajectory(tprob2.traj, 20)
-animate(traj, flg)
-
-
-
-
-
-
-
-
-
+animate(traj, ms)
