@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\jc1696\\\\OneDrive - University of Exeter\\\\Projects\\\\MicroSwimmersPlots\\\\src\" -Recurse)",
+      "Bash(Select-Object FullName, Length)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\jc1696\\\\Projects\\\\packages\\\\MicroSwimmersPlots\" -Recurse -Force)",
+      "Bash(Select-Object FullName)"
+    ]
+  }
+}
