@@ -14,6 +14,4 @@ include("viz.jl")
 include("animations.jl")
 include("exports.jl")
 
-set_theme!(theme_dark())
-
 end # module
