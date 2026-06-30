@@ -79,10 +79,10 @@ stream(ave_vf)
 prob = SwimmingTrajectoryProblem(chlamy, t_final=1.0, saveat=0.125, eps=1e-3)
 solve_problem!(prob, periodic=true)
 
-# Since the solution is periodic we can just replicate the trajectory 20 times
-continue_periodic_trajectory!(prob.traj, 1000)
+# Since the solution is periodic we can just replicate the trajectory 50 times
+continue_periodic_trajectory!(prob.traj, 50)
 prob.traj.x[end]
 viz(prob.traj)
 
 animate(prob, step=13, azimuth=π/4, elevation=π/4)
-animate(prob, step=13, azimuth=π/4, elevation=π/4, limits=(-5, 35, -10, 10, -8, 8), filename="chlamy_swimming.mp4", framerate=30)
+# animate(prob, step=13, azimuth=π/4, elevation=π/4, limits=(-5, 35, -10, 10, -8, 8), filename="chlamy_swimming.mp4", framerate=30)

@@ -110,7 +110,7 @@ prob_swimming = SwimmingTrajectoryProblem(excavate, t_final=1.0, saveat=0.05)
 
 solve_problem!(prob_swimming, periodic=true)
 
-continue_periodic_trajectory!(prob_swimming.traj, 40)
+continue_periodic_trajectory!(prob_swimming.traj, 20)
 
 animate(prob_swimming)
 
