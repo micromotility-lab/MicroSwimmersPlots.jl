@@ -1,8 +1,11 @@
 using LinearAlgebra
 using GeometryBasics
 
-
-smooth_max(a, b, k) = log(exp(k*a) + exp(k*b)) / k
+function smooth_max(a, b, k)
+    m = max(a, b)
+    m + log(exp(k*(a - m)) + exp(k*(b - m))) / k
+end
+# smooth_max(a, b, k) = log(exp(k*a) + exp(k*b)) / k
 
 function ellipsoid(p, a, b, c)
     x, y, z = p
