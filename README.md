@@ -2,7 +2,7 @@
 
 MicroSwimmersPlot.jl is a Julia package for visualising microswimmer simulations obtained with [MicroSwimmers.jl](https://github.com/micromotility-lab/MicroSwimmers.jl).
 
-This package has been developed by James Cass as a postdoc in the [micromotility lab](https://micromotility.com/) led by Kirsty Wan in the University of Exeter's Living Systems Institute.
+This package is developed by James Cass as a postdoc in the [micromotility lab](https://micromotility.com/) led by Kirsty Wan in the University of Exeter's Living Systems Institute.
 
 ## Installation
 
