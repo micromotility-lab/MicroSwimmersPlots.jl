@@ -11,6 +11,14 @@ function mesh_from_function(f::Function; origin=Vec3f(0., 0., 0), widths=Vec3f(1
     GeometryBasics.Mesh(Point3f.(points), TriangleFace.(faces))
 end
 
+function gen_mesh(body::ImplicitBodyModel)
+    mesh_from_function(
+        p -> implicit(body, SVector{3}(p)),
+        origin=Vec3f(-bounding_radius(body), -bounding_radius(body), -bounding_radius(body)),
+        widths=Vec3f(2*bounding_radius(body), 2*bounding_radius(body), 2*bounding_radius(body)),
+        samples=(150,150,150)
+    )
+end
 
 function gen_mesh(body::EllipsoidBody)
     @unpack a, b, c = body
