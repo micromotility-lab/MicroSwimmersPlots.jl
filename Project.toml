@@ -1,7 +1,7 @@
 name = "MicroSwimmersPlots"
 uuid = "34b2c936-1bed-4b60-bcf3-9558ddb71f37"
 authors = ["James Cass <jamesfcass@gmail.com>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
