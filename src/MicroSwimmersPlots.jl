@@ -9,8 +9,10 @@ using Meshing
 using StaticArrays
 using Interpolations
 
+include("implicit.jl")
 include("mesh_gen.jl")
 include("viz.jl")
+include("design.jl")
 include("animations.jl")
 include("exports.jl")
 
