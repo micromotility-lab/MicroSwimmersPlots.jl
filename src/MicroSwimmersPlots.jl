@@ -8,6 +8,7 @@ using Parameters
 using Meshing
 using StaticArrays
 using Interpolations
+using Accessors
 
 include("implicit.jl")
 include("mesh_gen.jl")

@@ -1,9 +1,10 @@
 name = "MicroSwimmersPlots"
 uuid = "34b2c936-1bed-4b60-bcf3-9558ddb71f37"
-authors = ["James Cass <jamesfcass@gmail.com>"]
 version = "0.2.1"
+authors = ["James Cass <jamesfcass@gmail.com>"]
 
 [deps]
+Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -14,6 +15,7 @@ Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
+Accessors = "0.1.45"
 Interpolations = "0.16.2"
 LinearAlgebra = "1.11.0"
 Makie = "0.24.6"

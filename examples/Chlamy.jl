@@ -33,19 +33,6 @@ model = PlanarFlagellum(
 model = PlanarFlagellum(11., C, .8, 0.15, 1.0π, 2π, 2π, 0.0)
 
 
-## You can use this function to get the spectrum for the standing wave flagellum from data
-## shear_angle is a matrix containing one period of oscillation of size S x T
-## with space points in the first dimension and time in the second
-## leave off the initial point at s=0 (where shear_angle=0 anyway)
-## The modes 01 - 31 above correspond to amplitude and phase of spectrum[1:4,2]
-## try plotting spectrum with a heatmap to see if shear_angle is well captured by these modes
-
-function spectrum_from_data(shear_angle)
-    n, m = size(shear_angle)
-    return FFTW.fft(FFTW.r2r(shear_angle, FFTW.RODFT01, 1), 2) / (n*m)
-end
-
-
 f1 = Part(
     model,
     N_f,
