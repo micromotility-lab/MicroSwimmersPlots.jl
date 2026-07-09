@@ -149,7 +149,7 @@ function design(tdf; fps=30, specs=param_specs(typeof(tdf)))
 end
 
 function design(p::Part; fps=30, specs=param_specs(typeof(tdf)))
-    specs = expand_specs(tdf, specs)          # ← vectors become component sliders
+    specs = expand_specs(p.model, specs)          # ← vectors become component sliders
     fig = Figure()
     ax = Axis3(fig[1:2,1:3], aspect=:data, limits=(-5.,5.,-5.,5.,-5.,5.))
     B = viz!(ax, p)
@@ -159,8 +159,8 @@ function design(p::Part; fps=30, specs=param_specs(typeof(tdf)))
     for (col, g) in enumerate(unique(s.group for s in specs))
         gspecs = filter(s -> s.group == g, specs)
         rows = [(label = s.label, range = s.range,
-                 startvalue = s.index === nothing ? getproperty(tdf, s.field)
-                                                  : getproperty(tdf, s.field)[s.index])
+                 startvalue = s.index === nothing ? getproperty(p.model, s.field)
+                                                  : getproperty(p.model, s.field)[s.index])
                 for s in gspecs]
         sg = SliderGrid(fig[3, col], rows...)
 
@@ -168,9 +168,9 @@ function design(p::Part; fps=30, specs=param_specs(typeof(tdf)))
             field, idx = s.field, s.index
             on(slider.value) do val
                 if idx === nothing
-                    setproperty!(tdf, field, val)
+                    setproperty!(p.model, field, val)
                 else
-                    setproperty!(tdf, field, _setcomp(getproperty(tdf, field), idx, val))
+                    setproperty!(p.model, field, _setcomp(getproperty(p.model, field), idx, val))
                 end
                 update_boundary!(p, t[]); update_buffer_observable!(B, p)
             end
