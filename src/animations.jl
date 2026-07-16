@@ -4,8 +4,8 @@ function animate(microswimmer::MicroSwimmer, T=5.0, num_t=20*5+1)
     B = viz!(ax, microswimmer)
     display(fig)
     for t in range(0, T, num_t)
-        update_boundary!(microswimmer, t)
-        update_buffer_observable!(B, microswimmer)
+        # update_boundary!(microswimmer, t)
+        update_buffer_observable!(B, microswimmer, t)
         sleep(0.01)
     end
 end
@@ -51,9 +51,8 @@ function animate(
     
     on(t) do i
         b1v, b2v = SVector{3}(traj.b1[i]), SVector{3}(traj.b2[i])
-        microswimmer.frame = Frame(SVector{3}(traj.x[i]), SMatrix{3,3}(hcat(b1v, b2v, cross(b1v, b2v))))
-        update_boundary!(microswimmer, ts[i])
-        update_buffer_observable!(obs, microswimmer)
+        move_boundary!(microswimmer, traj.x[i], b1v, b2v, ts[i])
+        update_buffer_observable!(obs, microswimmer, ts[i])
     end
 
     # pts = @lift(get_points($s))
@@ -140,9 +139,10 @@ function animate(
 
     
     on(t) do i
-        update_boundary!(microswimmer, ts[i])
-        update_buffer!(obs[], microswimmer)
-        notify(obs)
+        update_buffer_observable!(obs, microswimmer, ts[i])
+        # update_boundary!(microswimmer, ts[i])
+        # update_buffer!(obs[], microswimmer)
+        # notify(obs)
     end
 
     if isnothing(filename)

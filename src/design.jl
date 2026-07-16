@@ -105,6 +105,17 @@ param_specs(::Type{<:ThreeDimensionalStandingWaveFlagellum}) = [
     ParamSpec(:Iᵩ, L"Iᵩ", -1:0.05:1; group=:phi)
 ]
 
+param_specs(::Type{<:Vane}) = [
+    ParamSpec(:s_start, L"s_0", 0:0.01:1;  group=:vane),
+    ParamSpec(:s_end,   L"s_1", 0:0.01:1;  group=:vane),
+    ParamSpec(:H,       L"H",   0:0.1:10;  group=:vane),
+]
+
+param_specs(::Type{<:PlanarVanedFlagellum{FM}}) where {FM} = vcat(
+    nest(param_specs(FM), :flagellum),
+    nest(param_specs(Vane), :vane),
+)
+
 
 function design(tdf; fps=30, specs=param_specs(typeof(tdf)))
     specs = expand_specs(tdf, specs)          # ← vectors become component sliders
@@ -148,7 +159,7 @@ function design(tdf; fps=30, specs=param_specs(typeof(tdf)))
     return fig
 end
 
-function design(p::Part; fps=30, specs=param_specs(typeof(tdf)))
+function design(p::Part; fps=30, specs=param_specs(typeof(p.model)))
     specs = expand_specs(p.model, specs)          # ← vectors become component sliders
     fig = Figure()
     ax = Axis3(fig[1:2,1:3], aspect=:data, limits=(-5.,5.,-5.,5.,-5.,5.))

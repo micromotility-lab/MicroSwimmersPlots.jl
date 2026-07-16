@@ -21,16 +21,16 @@ function update_pts!(out_vec::AbstractVector{Point3f}, in_vec::AbstractVector{<:
     end
 end
 
-function update_buffer_observable!(B::Observable{P}, fb::FluidBoundary) where {P <: PlotBuffer}
-    update_buffer!(B[], fb)
+function update_buffer_observable!(B::Observable{<:PlotBuffer}, thing, t::Real=0.0)
+    update_buffer!(B[], thing, t)
     notify(B)
 end
 
 
-function viz(fb::FluidBoundary; kwargs...)
+function viz(thing; kwargs...)
     fig = Figure()
     ax = Axis3(fig[1,1], aspect=:data)
-    B = viz!(ax, fb; kwargs...)
+    B = viz!(ax, thing; kwargs...)
     display(fig)
     B
 end
@@ -41,140 +41,164 @@ function viz!(ax, buf::PlotBuffer; kwargs...)
     B
 end
 
-# for a cell body, this does not apply its local location and orientation
-function viz!(ax, fb::FluidBoundary, location=nothing, orientation=nothing; kwargs...)
-    buf = get_buffer(fb)
+# Entry point: build a buffer and populate it, then hand off to the Observable viz!.
+# Works uniformly for a bare Model, a Part, or a MicroSwimmer — everything below
+# dispatches on what `thing` is. `t` is a kwarg so the model-layer methods can
+# evaluate their shape; rigid models ignore it.
+function viz!(ax, thing::Union{Model, FluidBoundary},
+              location=nothing, orientation=nothing; t=0.0, kwargs...)
+    buf = get_buffer(thing)
     if !isnothing(location) && !isnothing(orientation)
-        update_buffer!(buf, fb, Point3f(location), Mat3f(orientation))
+        update_buffer!(buf, thing, t, Point3f(location), Mat3f(orientation))
     else
-        update_buffer!(buf, fb)
+        update_buffer!(buf, thing, t)
     end
     viz!(ax, buf; kwargs...)
 end
 
 
-# Cell bodies
+# ─── Part adapter ──────────────────────────────────────────────────────────
+# The ONLY place Part frames touch plotting. Composes the part's local frame
+# into the transform the model layer already accepts, then dispatches on the
+# model. Every buffer/model pair reaches its update_buffer! through here.
+
+get_buffer(p::Part; kwargs...) = get_buffer(p.model; kwargs...)
+
+function update_buffer!(buf::PlotBuffer, p::Part, t::Real=0.0,
+                        location=Point3f(0.), orientation=I3f)
+    gloc, gorient = Point3f(location), Mat3f(orientation)
+    ploc, porient = Point3f(p.frame.location), Mat3f(p.frame.orientation)
+    update_buffer!(buf, p.model, t, gloc + gorient * ploc, gorient * porient)
+end
+
+
+# ─── Cell bodies ───────────────────────────────────────────────────────────
 
 mutable struct CellBodyBuffer <: PlotBuffer
     mesh::GeometryBasics.Mesh
     ref_pts::Vector{Point3f}
 end
 
-function get_buffer(part::Part{<:CellBodyModel}; slice=false)
-    mesh = slice ? gen_mesh_sliced(part.model) : gen_mesh(part.model)
+function get_buffer(m::CellBodyModel; slice=false)
+    mesh = slice ? gen_mesh_sliced(m) : gen_mesh(m)
     ref_pts = copy(coordinates(mesh))
     CellBodyBuffer(mesh, ref_pts)
 end
 
-function update_buffer!(buf::CellBodyBuffer, part::Part{<:CellBodyModel}, location=Point3f(0.), orientation=I3f)
-    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(part.frame.location), Mat3f(part.frame.orientation))
-    update_pts!(buf.mesh.position, buf.mesh.position, location, orientation)
+# Rigid, so t is accepted for signature uniformity and ignored.
+function update_buffer!(buf::CellBodyBuffer, m::CellBodyModel, t::Real=0.0,
+                        location=Point3f(0.), orientation=I3f)
+    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(location), Mat3f(orientation))
 end
 
-function update_mesh!(buf::CellBodyBuffer, part::Part{<:CellBodyModel}, location::Point3f=Point3f(0.), orientation::Mat3f=I3f)
-    buf.mesh = gen_mesh(part.model)
+function update_mesh!(buf::CellBodyBuffer, m::CellBodyModel,
+                      location=Point3f(0.), orientation=I3f)
+    buf.mesh = gen_mesh(m)
     buf.ref_pts = copy(coordinates(buf.mesh))
-    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(part.frame.location), Mat3f(part.frame.orientation))
-    update_pts!(buf.mesh.position, buf.mesh.position, location, orientation)
+    update_pts!(buf.mesh.position, buf.ref_pts, Point3f(location), Mat3f(orientation))
 end
+
+# Convenience so update_mesh! still works when called with a Part (design tools
+# can trigger a remesh after e.g. changing an ImplicitBody parameter).
+update_mesh!(buf::CellBodyBuffer, p::Part{<:CellBodyModel},
+             location=Point3f(0.), orientation=I3f) =
+    update_mesh!(buf, p.model,
+                 Point3f(location) + Mat3f(orientation) * Point3f(p.frame.location),
+                 Mat3f(orientation) * Mat3f(p.frame.orientation))
 
 viz!(ax, B::Observable{CellBodyBuffer}; kwargs...) = mesh!(ax, @lift($B.mesh); kwargs...)
 
-# Flagellum 
+
+# ─── Flagellum (bare) ──────────────────────────────────────────────────────
 
 struct BareFlagellumBuffer <: FlagellumBuffer
     pts::Vector{Point3f}
+    scratch::Vector{SVector{3,Float64}}
 end
 
-get_buffer(f::Part{<:FlagellumModel}) = BareFlagellumBuffer(Vector{Point3f}(undef, nq(f.disc, 1)))
+get_buffer(m::FlagellumModel; N::Int=50) = BareFlagellumBuffer(
+    Vector{Point3f}(undef, N),
+    Vector{SVector{3,Float64}}(undef, N),
+)
 
-function update_buffer!(buf::BareFlagellumBuffer, f::Part{<:FlagellumModel}, location=Point3f(0.), orientation=I3f)
-    src = view(f.disc.quad_pts, f.disc.quad_part_ranges[1])
-    update_pts!(buf.pts, src, Point3f(f.frame.location), Mat3f(f.frame.orientation))
-    update_pts!(buf.pts, buf.pts, Point3f(location), Mat3f(orientation))
+function update_buffer!(buf::BareFlagellumBuffer, m::FlagellumModel, t::Real=0.0,
+                        location=Point3f(0.), orientation=I3f)
+    m(buf.scratch, Float64(t); include_endpoints=true)
+    update_pts!(buf.pts, buf.scratch, Point3f(location), Mat3f(orientation))
 end
-
-# get_buffer(f::Part{<:FlagellumModel}) = BareFlagellumBuffer(Vector{Point3f}(undef, nq(f.disc)))
-
-# function update_buffer!(buf::BareFlagellumBuffer, f::Part{<:FlagellumModel}, location=Point3f(0.), orientation=I3f)
-#     update_pts!(buf.pts, f.disc.quad_pts, Point3f(f.frame.location), Mat3f(f.frame.orientation))
-#     update_pts!(buf.pts, buf.pts, Point3f(location), Mat3f(orientation))
-# end
 
 function viz!(ax, B::Observable{BareFlagellumBuffer}; linewidth=3, color=:forestgreen)
     lines!(ax, @lift($B.pts), linewidth=linewidth, color=color)
 end
 
 
-# must match the include_endpoints flag passed to m.vane(...) in the quad branch
-# of (m::PlanarVanedFlagellum)(disc, t) — see note below
-const VANE_QUAD_ENDPOINTS = true
-
-# (N_v, height) — the shape the vane writes, mirroring vane_npoints
-function vane_grid_size(v::Vane, N, L, include_endpoints)
-    start = nearest_index(v.s_start, N, include_endpoints)
-    stop  = nearest_index(v.s_end,   N, include_endpoints)
-    (stop - start + 1, Nh(v, N, L))
-end
-
-vane_npoints(v::Vane, N, L, include_endpoints) = prod(vane_grid_size(v, N, L, include_endpoints))
+# ─── Planar vaned flagellum ────────────────────────────────────────────────
+# The vane is s ∈ [s_start, s_end] on the centreline, extruded to distance H
+# along v.direction (relative to the centreline point, so the sheet stays
+# attached under any centreline geometry — not just planar).
+#
+# Sampling is on the model, not the discretisation: for each of N_v horizontal
+# points we interpolate scratch (the centreline sample) at a fractional index,
+# then extrude that point over N_h + 1 rows. No snapping to quad nodes; the
+# quantisation you'd otherwise see in the design tool would be an artefact of
+# an N you haven't chosen yet.
 
 struct PlanarVanedFlagellumBuffer <: FlagellumBuffer
     flagellum_pts::Vector{Point3f}
-    vane_pts::Vector{Point3f}
+    scratch::Vector{SVector{3,Float64}}
     vane_x::Matrix{Float32}
     vane_y::Matrix{Float32}
     vane_z::Matrix{Float32}
 end
 
-function get_buffer(f::Part{<:PlanarVanedFlagellum})
-    m = f.model
-    N_f = nq(f.disc, 1)
-    N_v, height = vane_grid_size(m.vane, N_f, m.flagellum.L, VANE_QUAD_ENDPOINTS)
-    # height+1 columns: column 1 is the centreline span the vane hangs from,
-    # columns 2:end are the extruded rows
+function get_buffer(m::PlanarVanedFlagellum; N::Int=50, N_v::Int=15, N_h::Int=8)
     PlanarVanedFlagellumBuffer(
-        Vector{Point3f}(undef, N_f),
-        Vector{Point3f}(undef, N_v * (height + 1)),
-        Matrix{Float32}(undef, N_v, height + 1),
-        Matrix{Float32}(undef, N_v, height + 1),
-        Matrix{Float32}(undef, N_v, height + 1),
+        Vector{Point3f}(undef, N),
+        Vector{SVector{3,Float64}}(undef, N),
+        Matrix{Float32}(undef, N_v, N_h + 1),
+        Matrix{Float32}(undef, N_v, N_h + 1),
+        Matrix{Float32}(undef, N_v, N_h + 1),
     )
 end
 
-function update_buffer!(buf::PlanarVanedFlagellumBuffer, f::Part{<:PlanarVanedFlagellum},
-                        location=Point3f(0.), orientation=I3f)
-    m     = f.model
-    q_rng = f.disc.quad_part_ranges[1]
-    N_f   = length(q_rng)
-    N_v   = size(buf.vane_x, 1)
-    height = size(buf.vane_x, 2) - 1
+# Linear interpolation of the include_endpoints=true centreline sample at
+# fractional s ∈ [0,1].  scratch has N nodes at s = i/(N−1), i = 0..N−1.
+@inline function _sample_centreline(scratch::Vector{SVector{3,T}}, s::Real) where {T}
+    N = length(scratch)
+    f = clamp(s, zero(s), one(s)) * (N - 1)
+    i0 = clamp(floor(Int, f) + 1, 1, N - 1)
+    α = T(f - (i0 - 1))
+    (one(T) - α) * scratch[i0] + α * scratch[i0 + 1]
+end
 
-    floc, forient = Point3f(f.frame.location), Mat3f(f.frame.orientation)
-    gloc, gorient = Point3f(location), Mat3f(orientation)
+function update_buffer!(buf::PlanarVanedFlagellumBuffer, m::PlanarVanedFlagellum,
+                        t::Real=0.0, location=Point3f(0.), orientation=I3f)
+    N   = length(buf.scratch)
+    N_v = size(buf.vane_x, 1)
+    N_h = size(buf.vane_x, 2) - 1
+    loc, ori = Point3f(location), Mat3f(orientation)
 
-    # centreline
-    update_pts!(buf.flagellum_pts, view(f.disc.quad_pts, q_rng), floc, forient)
-    update_pts!(buf.flagellum_pts, buf.flagellum_pts, gloc, gorient)
+    # centreline in the model's own frame, then transformed for plotting
+    m.flagellum(buf.scratch, Float64(t); include_endpoints=true)
+    update_pts!(buf.flagellum_pts, buf.scratch, loc, ori)
 
-    # vane column 1: the attachment span, so the sheet meets the centreline
-    start = nearest_index(m.vane.s_start, N_f, VANE_QUAD_ENDPOINTS)
-    root  = q_rng[start:(start + N_v - 1)]
-    update_pts!(view(buf.vane_pts, 1:N_v), view(f.disc.quad_pts, root), floc, forient)
-
-    # vane columns 2:end: the extruded rows the vane appended after the centreline
-    ext = (last(q_rng) + 1):(last(q_rng) + N_v * height)
-    update_pts!(view(buf.vane_pts, (N_v + 1):length(buf.vane_pts)),
-                view(f.disc.quad_pts, ext), floc, forient)
-
-    update_pts!(buf.vane_pts, buf.vane_pts, gloc, gorient)
-
-    # column-major linear order matches the vane's block layout
-    @inbounds for i in eachindex(buf.vane_pts)
-        p = buf.vane_pts[i]
-        buf.vane_x[i] = p[1]
-        buf.vane_y[i] = p[2]
-        buf.vane_z[i] = p[3]
+    # vane sheet: for each horizontal sample j, interpolate the centreline at
+    # s(j) ∈ [s_start, s_end] and extrude along v.direction over [0, H].
+    v = m.vane
+    d  = SVector{3,Float64}(v.direction)
+    Δs = v.s_end - v.s_start
+    ds_step = N_v > 1 ? Δs / (N_v - 1) : 0.0
+    dh_step = N_h > 0 ? Float64(v.H) / N_h : 0.0
+    @inbounds for j in 1:N_v
+        s_j     = v.s_start + (j - 1) * ds_step
+        p_center = _sample_centreline(buf.scratch, s_j)
+        for k in 1:(N_h + 1)
+            p_local = p_center + ((k - 1) * dh_step) * d
+            p_world = loc + ori * Point3f(p_local)
+            buf.vane_x[j, k] = p_world[1]
+            buf.vane_y[j, k] = p_world[2]
+            buf.vane_z[j, k] = p_world[3]
+        end
     end
 end
 
@@ -188,7 +212,8 @@ function viz!(ax, B::Observable{PlanarVanedFlagellumBuffer};
     nothing
 end
 
-# MicroSwimmer
+
+# ─── MicroSwimmer ──────────────────────────────────────────────────────────
 
 struct MicroSwimmerBuffer{FB <: FlagellumBuffer} <: PlotBuffer
     body_buffers::Vector{CellBodyBuffer}
@@ -201,20 +226,22 @@ function get_buffer(ms::MicroSwimmer)
     MicroSwimmerBuffer(body_bufs, flag_bufs)
 end
 
-function update_buffer!(buf::MicroSwimmerBuffer, ms::MicroSwimmer,
-    location=Point3f(ms.frame.location),
-    orientation=Mat3f(ms.frame.orientation))
-    body_parts = filter(p -> p.model isa CellBodyModel, ms.parts)
-    flag_parts = filter(p -> p.model isa FlagellumModel, ms.parts)
-    for (i, p) in enumerate(body_parts)
-        update_buffer!(buf.body_buffers[i], p, location, orientation)
-    end
-    for (i, p) in enumerate(flag_parts)
-        update_buffer!(buf.flagellum_buffers[i], p, location, orientation)
+function update_buffer!(buf::MicroSwimmerBuffer, ms::MicroSwimmer, t::Real=0.0,
+                        location=Point3f(ms.frame.location),
+                        orientation=Mat3f(ms.frame.orientation))
+    body_i, flag_i = 1, 1
+    for p in ms.parts
+        if p.model isa CellBodyModel
+            update_buffer!(buf.body_buffers[body_i], p, t, location, orientation)
+            body_i += 1
+        elseif p.model isa FlagellumModel
+            update_buffer!(buf.flagellum_buffers[flag_i], p, t, location, orientation)
+            flag_i += 1
+        end
     end
 end
 
-function viz!(ax, B::Observable{MicroSwimmerBuffer};
+function viz!(ax, B::Observable{<:MicroSwimmerBuffer};
     bodycolor=Makie.wong_colors()[1],
     linewidth=3,
     color=:forestgreen,
@@ -284,7 +311,7 @@ function viz(prob::SwimmingTrajectoryProblem)
     s = Slider(fig[2,1], range=1:length(prob.traj.t), startvalue=1)
     on(s.value) do val
         move_boundary!(prob, val)
-        update_buffer_observable!(B, prob.swimming_problem.microswimmer)
+        update_buffer_observable!(B, prob.swimming_problem.microswimmer, prob.traj.t[val])
     end
     fig
 end
