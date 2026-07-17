@@ -13,7 +13,7 @@ using Accessors
 include("implicit.jl")
 include("mesh_gen.jl")
 include("viz2.jl")
-include("design.jl")
+include("design2.jl")
 include("animations.jl")
 include("exports.jl")
 

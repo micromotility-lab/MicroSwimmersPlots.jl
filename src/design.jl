@@ -8,15 +8,16 @@ struct ParamSpec
     group::Symbol
     get::Union{Nothing,Function}   # m -> value
     set::Union{Nothing,Function}   # (m, v) -> (possibly new) m
+    path::Tuple{Vararg{Symbol}}
 end
 
 # your existing positional form — unchanged behaviour
-ParamSpec(field::Symbol, label, range; group, index=nothing, get=nothing, set=nothing) =
-    ParamSpec(field, label, range, index, group, get, set)
+ParamSpec(field::Symbol, label, range; group, index=nothing, get=nothing, set=nothing, path=()) =
+    ParamSpec(field, label, range, index, group, get, set, path)
 
 # lens form: no backing field, addresses nested/derived params
-ParamSpec(label, range; group, get, set) =
-    ParamSpec(:_, label, range, nothing, group, get, set)
+ParamSpec(label, range; group, get, set, path) =
+    ParamSpec(:_, label, range, nothing, group, get, set, path)
 
 specget(m, s::ParamSpec) = s.get !== nothing ? s.get(m) :
     (s.index === nothing ? getproperty(m, s.field) : getproperty(m, s.field)[s.index])
@@ -49,10 +50,10 @@ _setcomp(v::SVector{N,T}, i, x) where {N,T} =
 _setcomp(v::AbstractVector, i, x) = (w = copy(v); w[i] = x; w)   # fallback for Vector
 
 # expand any vector-valued field into one spec per component
-function expand_specs(tdf, specs)
+function expand_specs(model, specs)
     out = ParamSpec[]
     for s in specs
-        v = getproperty(tdf, s.field)
+        v = getproperty(resolve(model, specs), s.field)
         if v isa AbstractVector
             for k in eachindex(v)
                 # lbl = latexstring(string(s.field), "_{", k, "}")   # R_{1}, R_{2}, …
@@ -64,6 +65,28 @@ function expand_specs(tdf, specs)
     end
     out
 end
+
+resolve(model, s) = foldl(getproperty, s.path; init=model)
+nest(specs, prefix::Symbol...) =
+    [ParamSpec(s.field, s.label, s.range; group=s.group, path=(prefix..., s.path...)) for s in specs]
+
+    # L::T
+    # C::T        # static curvature (accumulated over fractional s)
+    # R₀::T       # base amplitude
+    # R₁::T       # amplitude modulation
+    # k::T        # amplitude wavenumber
+    # ϕ::T        # phase gradient (sets wavelength)
+    # ω::T        # beat frequency
+    # δ::T        # phase offset
+param_specs(::Type{<:PlanarFlagellum}) = [
+    ParamSpec(:L, L"L", 0:0.1:20; group=:flagellum),
+    ParamSpec(:C, L"C", -3:0.05:3; group=:flagellum),
+    ParamSpec(:R₀, L"R_0", 0:0.05:1.5; group=:flagellum),
+    ParamSpec(:R₁, L"R_1", 0:0.05:1.5; group=:flagellum),
+    ParamSpec(:k, L"k", 0:0.05:3; group=:flagellum),
+    ParamSpec(:ϕ, L"\phi", 0:0.05:3; group=:flagellum),
+    ParamSpec(:ω, L"\omega", 0:0.5:100; group=:flagellum),
+]
 
 param_specs(::Type{<:ThreeDimensionalFlagellum}) = [
     ParamSpec(:L,   L"L",        0:0.1:20;    group=:body),
@@ -124,7 +147,7 @@ function design(tdf; fps=30, specs=param_specs(typeof(tdf)))
     p = Part(tdf, 33, 117)
     B = viz!(ax, p)
     dt = 1/fps; t = Ref(0.0)
-    animstep() = (t[] += dt; update_boundary!(p, t[]); update_buffer_observable!(B, p))
+    animstep() = (t[] += dt; update_buffer_observable!(B, p, t[]))
 
     for (col, g) in enumerate(unique(s.group for s in specs))
         gspecs = filter(s -> s.group == g, specs)
@@ -142,7 +165,7 @@ function design(tdf; fps=30, specs=param_specs(typeof(tdf)))
                 else
                     setproperty!(tdf, field, _setcomp(getproperty(tdf, field), idx, val))
                 end
-                update_boundary!(p, t[]); update_buffer_observable!(B, p)
+                update_buffer_observable!(B, p, t[])
             end
         end
     end
@@ -159,19 +182,19 @@ function design(tdf; fps=30, specs=param_specs(typeof(tdf)))
     return fig
 end
 
-function design(p::Part; fps=30, specs=param_specs(typeof(p.model)))
-    specs = expand_specs(p.model, specs)          # ← vectors become component sliders
+function design(p::Part; fps=30, specs=param_specs(typeof(resolve(p.model, specs))))
+    specs = expand_specs(resolve(p.model, specs), specs)          # ← vectors become component sliders
     fig = Figure()
     ax = Axis3(fig[1:2,1:3], aspect=:data, limits=(-5.,5.,-5.,5.,-5.,5.))
     B = viz!(ax, p)
     dt = 1/fps; t = Ref(0.0)
-    animstep() = (t[] += dt; update_boundary!(p, t[]); update_buffer_observable!(B, p))
+    animstep() = (t[] += dt; update_buffer_observable!(B, p, t[]))
 
     for (col, g) in enumerate(unique(s.group for s in specs))
         gspecs = filter(s -> s.group == g, specs)
         rows = [(label = s.label, range = s.range,
-                 startvalue = s.index === nothing ? getproperty(p.model, s.field)
-                                                  : getproperty(p.model, s.field)[s.index])
+                 startvalue = s.index === nothing ? getproperty(resolve(p.model, specs), s.field)
+                                                  : getproperty(resolve(p.model, specs), s.field)[s.index])
                 for s in gspecs]
         sg = SliderGrid(fig[3, col], rows...)
 
@@ -179,11 +202,11 @@ function design(p::Part; fps=30, specs=param_specs(typeof(p.model)))
             field, idx = s.field, s.index
             on(slider.value) do val
                 if idx === nothing
-                    setproperty!(p.model, field, val)
+                    setproperty!(resolve(p.model, specs), field, val)
                 else
-                    setproperty!(p.model, field, _setcomp(getproperty(p.model, field), idx, val))
+                    setproperty!(resolve(p.model, specs), field, _setcomp(getproperty(resolve(p.model, specs), field), idx, val))
                 end
-                update_boundary!(p, t[]); update_buffer_observable!(B, p)
+                update_buffer_observable!(B, p, t[])
             end
         end
     end
