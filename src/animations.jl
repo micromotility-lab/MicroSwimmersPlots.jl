@@ -1,12 +1,12 @@
-function animate(microswimmer::MicroSwimmer, T=5.0, num_t=20*5+1)
+function animate(microswimmer::MicroSwimmer; T=5, num_t=20*T+1, limits=(nothing, nothing, nothing, nothing, nothing, nothing))
     fig = Figure()
-    ax = Axis3(fig[1,1], aspect=:data)
+    ax = Axis3(fig[1,1], aspect=:data, limits=limits)
     B = viz!(ax, microswimmer)
     display(fig)
     for t in range(0, T, num_t)
         # update_boundary!(microswimmer, t)
         update_buffer_observable!(B, microswimmer, t)
-        sleep(0.01)
+        sleep(0.05)
     end
 end
 

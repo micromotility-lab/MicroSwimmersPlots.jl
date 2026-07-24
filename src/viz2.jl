@@ -221,8 +221,8 @@ struct MicroSwimmerBuffer{FB <: FlagellumBuffer} <: PlotBuffer
 end
 
 function get_buffer(ms::MicroSwimmer)
-    body_bufs = [get_buffer(p) for p in ms.parts if p.model isa CellBodyModel]
-    flag_bufs = [get_buffer(p) for p in ms.parts if p.model isa FlagellumModel]
+    body_bufs = CellBodyBuffer[get_buffer(p) for p in ms.parts if p.model isa CellBodyModel]
+    flag_bufs = FlagellumBuffer[get_buffer(p) for p in ms.parts if p.model isa FlagellumModel]
     MicroSwimmerBuffer(body_bufs, flag_bufs)
 end
 
@@ -483,6 +483,7 @@ stream(vf::PlanarVelocityField; kwargs...) = begin
     stream!(fig[1,1], vf; kwargs...)
     display(fig)
     resize_to_layout!(fig)
+    fig
 end
 
 viz(fv::FluidVelocity, 

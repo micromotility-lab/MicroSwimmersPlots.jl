@@ -112,8 +112,8 @@ param_specs(::Type{<:PlanarFlagellum}) = [
     ParamSpec(:C, L"C", -3:0.05:3; group=:flagellum),
     ParamSpec(:R₀, L"R_0", 0:0.05:1.5; group=:flagellum),
     ParamSpec(:R₁, L"R_1", 0:0.05:1.5; group=:flagellum),
-    ParamSpec(:k, L"k", 0:0.05:3; group=:flagellum),
-    ParamSpec(:ϕ, L"\phi", 0:0.05:3; group=:flagellum),
+    ParamSpec(:k, L"k", 0:0.05:8; group=:flagellum),
+    ParamSpec(:ϕ, L"\phi", 0:0.05:8; group=:flagellum),
     ParamSpec(:ω, L"\omega", 0:0.5:100; group=:flagellum),
 ]
 
@@ -124,14 +124,14 @@ param_specs(::Type{<:ThreeDimensionalFlagellum}) = [
     ParamSpec(:Aᵩ,  L"A_\phi",   0:0.1:1.5;   group=:phi),
     ParamSpec(:δᵩ,  L"δ_\phi",   0:0.01:4;    group=:phi),
     ParamSpec(:λᵩ,  L"λ_\phi",   0:0.5:30;    group=:phi),
-    ParamSpec(:Cᵩ,  L"C_\phi",   -3:0.05:3;   group=:phi),
+    ParamSpec(:Cᵩ,  L"C_\phi",   -1:0.01:1;   group=:phi),
     ParamSpec(:Δγ,  L"Δϕ",       -1.0π:0.1:π; group=:phi),   # label ≠ field name
 
     ParamSpec(:f_θ, L"f_θ",      0:0.5:100;   group=:theta),
     ParamSpec(:A_θ, L"A_θ",      0:0.1:1.5;   group=:theta),
     ParamSpec(:δ_θ, L"δ_θ",      0:0.01:4;    group=:theta),
     ParamSpec(:λ_θ, L"λ_θ",      0:0.5:30;    group=:theta),
-    ParamSpec(:C_θ, L"C_θ",      -3:0.05:3;   group=:theta),
+    ParamSpec(:C_θ, L"C_θ",      -1:0.01:1;   group=:theta),
 ]
 
 param_specs(::Type{<:PlanarStandingWaveFlagellum}) = [
@@ -215,7 +215,8 @@ no `Part`, no `NearestDiscretisation`. Extra `kwargs` are forwarded to `viz!`
 (and thence `get_buffer`), so e.g. `design(vf; N=80, N_v=25, N_h=12)`.
 """
 function design(m::Model; fps=30, specs=param_specs(typeof(m)),
-                limits=(-5.,5.,-5.,5.,-5.,5.), kwargs...)
+                limits=(nothing, nothing, nothing, nothing, nothing, nothing),
+                kwargs...)
     specs = expand_specs(m, specs)          # ← vectors become component sliders
     fig = Figure()
     ax  = Axis3(fig[1:2,1:3], aspect=:data, limits=limits)
@@ -229,23 +230,4 @@ function design(m::Model; fps=30, specs=param_specs(typeof(m)),
     display(fig)
     _controls!(fig, animstep, dt)
     return fig
-end
-
-# Part method: same machinery, but the frame composition lives in the generic
-# Part adapter, and `update_boundary!` is kept because a Part carries BEM state.
-function design(p::Part; fps=30, specs=param_specs(typeof(p.model)),
-                limits=(-5.,5.,-5.,5.,-5.,5.), kwargs...)
-    specs = expand_specs(p.model, specs)
-    fig = Figure()
-    ax  = Axis3(fig[1:2,1:3], aspect=:data, limits=limits)
-    B   = viz!(ax, p; t=0.0, kwargs...)
-
-    dt = 1/fps; t = Ref(0.0)
-    redraw()   = (update_buffer_observable!(B, p, t[]))
-    animstep() = (t[] += dt; redraw())
-
-    _sliders!(fig, 3, p.model, specs, redraw)
-    display(fig)
-    _controls!(fig, animstep, dt)
-    fig
 end
