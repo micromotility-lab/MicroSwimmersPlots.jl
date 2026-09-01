@@ -14,7 +14,7 @@ function BandedSphericalMicroSwimmer(;
     tilt_angle=0.,           # tilt of ciliary beat plane
     h=0.                     # the height of the band above/below the equator
 )
-    body = Part(EllipsoidBody(a, a, a), body_N, body_Q)
+    body = Part(EllipsoidBody(a, a, a), body_N, body_Q; eps=0.1)
 
     # some maths
     R_tilt = rotation_matrix([1., 0., 0.], tilt_angle)
@@ -27,6 +27,7 @@ function BandedSphericalMicroSwimmer(;
         PlanarFlagellum(1., -2.5, 0.7, 0.15, 2π, 2π, 2π, n*total_phase_diff/num_flagella),
         15,
         117,
+        eps=0.1,
         location=[h, r*cos(2π*n/num_flagella), r*sin(2π*n/num_flagella)],
         orientation = rotation_matrix([1., 0., 0.], 2pi*n/num_flagella) * rotation_matrix([0., 0., 1.], -θ) * R * R_tilt
     ) for n in 1:num_flagella]

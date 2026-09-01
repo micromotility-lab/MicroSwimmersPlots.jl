@@ -14,7 +14,7 @@ Q_body = 993   # body quadrature points
 N_flagellum = 53
 Q_flagellum = 417
 
-body = Part(EllipsoidBody(a, a, a), N_body, Q_body)
+body = Part(EllipsoidBody(a, a, a), N_body, Q_body; eps=0.1)
 
 # The flagellum model is a sum of standing waves
 # θ(s) = A01*exp(iϕ01)*sin(π*s/2) + A11*exp(iϕ11)*sin(3π*s/2) + A21*exp(iϕ21)*sin(5π*s/2) + A31*exp(iϕ31)*sin(7π*s/2)
@@ -44,6 +44,7 @@ end
 
 flagellum = Part(
     f_model, N_flagellum, Q_flagellum,
+    eps=0.1,
     location=[a*cos(α), a*sin(α), 0.]
 )
 
@@ -54,7 +55,7 @@ pterosperma = MicroSwimmer([body, flagellum])
 
 x_points = range(-50.0, 70., 30)
 y_points = range(-60.0, 60., 30)
-traj_prob = SwimmingTrajectoryProblem(pterosperma, eps=0.1, t_final=1.0, saveat=0.05)
+traj_prob = SwimmingTrajectoryProblem(pterosperma, t_final=1.0, saveat=0.05)
 solve_problem!(traj_prob)
 
 
@@ -65,6 +66,6 @@ fig = stream(vf)
 
 #### Visualise the trajectory
 
-traj_prob = SwimmingTrajectoryProblem(pterosperma, t_final=10.0, eps=0.1)
+traj_prob = SwimmingTrajectoryProblem(pterosperma, t_final=10.0)
 solve_problem!(traj_prob)
 animate(traj_prob, step=1)

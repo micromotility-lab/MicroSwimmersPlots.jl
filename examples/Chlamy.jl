@@ -15,7 +15,10 @@ Q_body=3111   # number of quadrature points in body discretisation
 N_f=31       # number of force points in flagellum discretisation
 Q_f=151       # number of quadrature points in flagellum discretisation
 
-body = Part(EllipsoidBody(a, b, c), N_body, Q_body)
+# eps is set per part. NOTE: 1e-3 um is far below the quadrature spacing of this cloud
+# (hq is of order 0.3 um here), so the blob is badly under-sampled; it is kept only to
+# reproduce this example's original output. Something nearer 0.25 um resolves properly.
+body = Part(EllipsoidBody(a, b, c), N_body, Q_body; eps=1e-3)
 
 # Use a planar flagellum model for the tangent angle:
 # θ(s,t) = Cs + (R₀ + R₁ sin(ks/L))*cos(ωt - ϕs/L)
@@ -37,6 +40,7 @@ f1 = Part(
     model,
     N_f,
     Q_f,
+    eps=1e-3,
     location=[a*cos(α), b*sin(α), 0],
     orientation=rotation_matrix([0.,0.,1.], π/4)*rotation_matrix([1.,0.,0.], 4π/5)
 )
@@ -45,6 +49,7 @@ f2 = Part(
     model,
     N_f,
     Q_f,
+    eps=1e-3,
     location=[a*cos(α), -b*sin(α), 0],
     orientation=rotation_matrix([0., 0., 1.], -π/4)*rotation_matrix([1.,0.,0.], 0.0),
 )
@@ -63,7 +68,7 @@ ave_vf = TimeAveragedPlanarVelocityField(prob, x_points, y_points; period=1.0, n
 stream(ave_vf)
 
 # We'll solve for the swimming trajectory
-prob = SwimmingTrajectoryProblem(chlamy, t_final=1.0, saveat=0.125, eps=1e-3)
+prob = SwimmingTrajectoryProblem(chlamy, t_final=1.0, saveat=0.125)
 solve_problem!(prob, periodic=true)
 
 # Since the solution is periodic we can just replicate the trajectory 50 times

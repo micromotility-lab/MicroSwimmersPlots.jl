@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "5c913abfbf9c43b3caee02636389a17d2b0c63c7"
+project_hash = "71b065879f1de7f30311d5ee7a7d97a6593a236f"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "d9aaef7c63466eee4de23b4d9dad03629df54bea"
@@ -1391,13 +1391,13 @@ uuid = "e6723b4c-ebff-59f1-b4b7-d97aa5274f73"
 version = "0.7.0"
 
 [[deps.MicroSwimmers]]
-deps = ["DSP", "DiffEqBase", "FastGaussQuadrature", "ForwardDiff", "GeometryBasics", "LinearAlgebra", "LinearSolve", "LsqFit", "OrdinaryDiffEq", "Parameters", "Rotations", "SparseArrays", "StaticArrays", "Statistics"]
+deps = ["DSP", "DiffEqBase", "FastGaussQuadrature", "ForwardDiff", "GeometryBasics", "LinearAlgebra", "LinearSolve", "LsqFit", "OrdinaryDiffEq", "Parameters", "Polyester", "Rotations", "SciMLOperators", "SparseArrays", "StaticArrays", "Statistics"]
 path = "../MicroSwimmers"
 uuid = "ef328505-3371-4e33-b87d-074fe3df2cb3"
-version = "0.2.0"
+version = "0.3.0"
 
 [[deps.MicroSwimmersPlots]]
-deps = ["GeometryBasics", "Interpolations", "LinearAlgebra", "Makie", "Meshing", "MicroSwimmers", "Parameters", "StaticArrays"]
+deps = ["Accessors", "GeometryBasics", "Interpolations", "LinearAlgebra", "Makie", "Meshing", "MicroSwimmers", "Parameters", "StaticArrays"]
 path = "."
 uuid = "34b2c936-1bed-4b60-bcf3-9558ddb71f37"
 version = "0.2.1"

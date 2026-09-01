@@ -28,14 +28,17 @@ model = PlanarFlagellum(
 N = 23    # force points
 Q = 127   # quadrature points
 
-f = Part(model, N, Q)
+# eps is the regularisation parameter, and it belongs to the Part rather than the problem:
+# on a slender flagellum it stands for the physical radius of the filament, while on a cell
+# body it is only a numerical regularisation of the singular Stokeslet.
+f = Part(model, N, Q; eps=0.1)
 
 # Some alternative flagella beating envelopes changing R₀, R₁ and k
 
-f = Part(PlanarFlagellum(1., 0., 0.6, 0., 2π, 2π, 2π, 0.0), N, Q)
-f = Part(PlanarFlagellum(1., 0., 1.3, 0., 2π, 2π, 2π, 0.0), N, Q)
-f = Part(PlanarFlagellum(1., 0., 0., 0.5, π/2, 2π, 2π, 0.0), N, Q)
-f = Part(PlanarFlagellum(1., 0., 0.6, 0.5, π/2, -2π, 2π, 0.0), N, Q)
+f = Part(PlanarFlagellum(1., 0., 0.6, 0., 2π, 2π, 2π, 0.0), N, Q; eps=0.1)
+f = Part(PlanarFlagellum(1., 0., 1.3, 0., 2π, 2π, 2π, 0.0), N, Q; eps=0.1)
+f = Part(PlanarFlagellum(1., 0., 0., 0.5, π/2, 2π, 2π, 0.0), N, Q; eps=0.1)
+f = Part(PlanarFlagellum(1., 0., 0.6, 0.5, π/2, -2π, 2π, 0.0), N, Q; eps=0.1)
 
 ms = MicroSwimmer([f])
 
@@ -135,7 +138,10 @@ c = 1.0 # semi-minor axis
 N_body = 213 # number of force points
 Q_body = 917 # number of quadrature points
 
-body = Part(EllipsoidBody(a, b, c), N_body, Q_body)
+body = Part(EllipsoidBody(a, b, c), N_body, Q_body; eps=0.1)
+
+# Part(model) can also pick N and Q for you, from a target force-point spacing and from eps:
+#   body = Part(EllipsoidBody(a, b, c); eps=0.1)
 
 # Let's redefine the flagellum above, this time we will add a location where we want the flagellum to be attached
 
@@ -143,6 +149,7 @@ f = Part(
     PlanarFlagellum(10., 0., 0.6, 0.5, π/2, 2π, 2π, 0.0),
     N,
     Q,
+    eps=0.1,
     location=[1.0, 0.0, 0.0],                         # connect to the edge on the x-axis
     orientation=rotation_matrix([1.0, 0., 0.], 0.0)   # you can also change the orientation using rotation_matrix(axis, angle)
 )

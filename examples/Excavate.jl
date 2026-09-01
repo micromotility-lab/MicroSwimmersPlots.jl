@@ -25,7 +25,7 @@ groove_center = [0., 0., 1.5]
 N_body = 157
 Q_body = 717
 
-body = Part(EllipsoidalGroovedBody(a, b, c, groove_center), N_body, Q_body)
+body = Part(EllipsoidalGroovedBody(a, b, c, groove_center), N_body, Q_body; eps=0.1)
 
 #############################################################################
 #### Flagella: anterior and posterior #######################################
@@ -55,6 +55,7 @@ anterior = Part(
     anterior_model,
     N,
     Q,
+    eps=0.1,
     location=anterior_location,
     orientation=anterior_orientation
 )
@@ -83,6 +84,7 @@ posterior = Part(
     posterior_model,
     N_f,
     Q_f,
+    eps=0.1,
     location=posterior_location,
     orientation=posterior_orientation
 )
