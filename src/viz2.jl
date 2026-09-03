@@ -215,6 +215,67 @@ end
 
 # ─── MicroSwimmer ──────────────────────────────────────────────────────────
 
+# ─── Tube flagellum ────────────────────────────────────────────────────────
+# Drawn as the centreline plus the tube surface. The surface points come from
+# MicroSwimmers.fill_tube!, the same parallel-transported construction the
+# SurfaceTubeFlagellum discretises with, rather than a second implementation
+# here: a Gram-Schmidt frame rebuilt per station would jump when the tangent
+# crosses |t_x| = 0.9 and put a visible twist in the rendered surface.
+#
+# The ring is closed by repeating column 1 as column n_ring+1, so surface! sees
+# a seamless tube instead of a sheet with a slit down it.
+
+struct TubeFlagellumBuffer <: FlagellumBuffer
+    centreline::Vector{Point3f}
+    scratch::Vector{SVector{3,Float64}}
+    ring_scratch::Vector{SVector{3,Float64}}
+    tube_x::Matrix{Float32}
+    tube_y::Matrix{Float32}
+    tube_z::Matrix{Float32}
+end
+
+function get_buffer(m::TubeFlagellum; N::Int=60, N_ring::Int=16)
+    TubeFlagellumBuffer(
+        Vector{Point3f}(undef, N),
+        Vector{SVector{3,Float64}}(undef, N),
+        Vector{SVector{3,Float64}}(undef, N * N_ring),
+        Matrix{Float32}(undef, N, N_ring + 1),
+        Matrix{Float32}(undef, N, N_ring + 1),
+        Matrix{Float32}(undef, N, N_ring + 1),
+    )
+end
+
+function update_buffer!(buf::TubeFlagellumBuffer, m::TubeFlagellum, t::Real=0.0,
+                        location=Point3f(0.), orientation=I3f)
+    N      = length(buf.scratch)
+    n_ring = size(buf.tube_x, 2) - 1
+    loc, ori = Point3f(location), Mat3f(orientation)
+
+    m.flagellum(buf.scratch, Float64(t); include_endpoints=true)
+    update_pts!(buf.centreline, buf.scratch, loc, ori)
+
+    MicroSwimmers.fill_tube!(buf.ring_scratch, m.flagellum, m.radius, n_ring,
+                             Float64(t); include_endpoints=true)
+    @inbounds for i in 1:N, j in 1:(n_ring + 1)
+        jj = j == n_ring + 1 ? 1 : j            # close the ring
+        w  = loc + ori * Point3f(buf.ring_scratch[(i - 1) * n_ring + jj])
+        buf.tube_x[i, j] = w[1]
+        buf.tube_y[i, j] = w[2]
+        buf.tube_z[i, j] = w[3]
+    end
+end
+
+function viz!(ax, B::Observable{TubeFlagellumBuffer};
+              linewidth=3, color=:forestgreen, tube_color=(:forestgreen, 0.45))
+    lines!(ax, @lift($B.centreline), linewidth=linewidth, color=color)
+    c = Makie.to_color(tube_color)
+    surface!(ax, @lift($B.tube_x), @lift($B.tube_y), @lift($B.tube_z),
+             color = @lift(fill(c, size($B.tube_x))),
+             transparency=true, shading=NoShading)
+    nothing
+end
+
+
 struct MicroSwimmerBuffer{FB <: FlagellumBuffer} <: PlotBuffer
     body_buffers::Vector{CellBodyBuffer}
     flagellum_buffers::Vector{FB}
@@ -265,7 +326,8 @@ function viz!(ax, prob::SwimmingProblem; rasterize=1, step=1, kwargs...)
     Fmag = norm.(forces)
     Fmax = maximum(Fmag)
     flag_idx = findfirst(p -> p.model isa FlagellumModel, prob.microswimmer.parts)
-    L = isnothing(flag_idx) ? 1.0 : prob.microswimmer.parts[flag_idx].model.L
+    # arclength, not .model.L: a wrapper model (vane, tube) has no L field of its own.
+    L = isnothing(flag_idx) ? 1.0 : arclength(prob.microswimmer.parts[flag_idx].model)
 
     ar = arrows2d!(
         ax,

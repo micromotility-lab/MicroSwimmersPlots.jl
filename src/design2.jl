@@ -168,6 +168,19 @@ param_specs(::Type{<:PlanarVanedFlagellum{FM}}) where {FM} = vcat(
     nest(param_specs(Vane), :vane),
 )
 
+# Radius is the knob the tube exists to expose, so it gets a slider. The
+# cross-section counts do not: they are discretisation, not waveform, and
+# changing them mid-session would resize the buffers out from under the plot.
+param_specs(::Type{<:LineTubeFlagellum{FM}}) where {FM} = vcat(
+    nest(param_specs(FM), :flagellum),
+    [ParamSpec(:radius, L"a", 0:0.005:1; group=:tube)],
+)
+
+param_specs(::Type{<:SurfaceTubeFlagellum{FM}}) where {FM} = vcat(
+    nest(param_specs(FM), :flagellum),
+    [ParamSpec(:radius, L"a", 0:0.005:1; group=:tube)],
+)
+
 # ---------------------------------------------------------------------------
 # design
 # ---------------------------------------------------------------------------
